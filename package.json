@@ -1,0 +1,19 @@
+{
+  "name": "dead-mans-switch",
+  "version": "1.0.0",
+  "description": "Dead Man's Switch — Miden Wallet Frontend",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0",
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-wasm": "^3.5.0"
+  },
+  "dependencies": {
+    "@miden-sdk/miden-sdk": "^0.13.2"
+  }
+}

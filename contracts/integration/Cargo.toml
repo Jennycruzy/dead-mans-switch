@@ -1,0 +1,19 @@
+[package]
+name = "deadmans-integration"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "deploy"
+path = "src/bin/deploy.rs"
+
+[[bin]]
+name = "check-in"
+path = "src/bin/check_in.rs"
+
+[dependencies]
+miden-client = { workspace = true }
+miden-protocol = { workspace = true }
+miden-standards = { workspace = true }
+miden-tx = { workspace = true }
+tokio = { version = "1", features = ["full"] }

@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = [
+    "contracts/deadmans-wallet",
+    "integration",
+]
+
+[workspace.dependencies]
+miden-sdk = "0.13"
+miden-client = "0.13"
+miden-protocol = "0.13"
+miden-standards = "0.13"
+miden-tx = "0.13"
