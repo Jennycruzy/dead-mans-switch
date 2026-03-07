@@ -21,14 +21,25 @@ export const PERIOD_PRESETS = {
     yearly: { label: 'Yearly', blocks: 10_512_000, days: 365 },
 };
 
+import { CONFIG } from './config.js';
+
 function generateAccountId() {
     const prefix = '0x' + Array.from({ length: 8 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
     const suffix = '0x' + Array.from({ length: 8 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
     return { prefix, suffix };
 }
 
+function parseHexAccountId(hexId) {
+    if (!hexId) return null;
+    return {
+        prefix: hexId.substring(0, 10),
+        suffix: '0x' + hexId.substring(hexId.length - 8),
+        full: hexId
+    };
+}
+
 function getDefaultState() {
-    const owner = generateAccountId();
+    const owner = parseHexAccountId(CONFIG.CONTRACT_ACCOUNT_ID);
     const beneficiary = generateAccountId();
     return {
         // Connection state
@@ -53,8 +64,7 @@ function getDefaultState() {
         // Assets
         vaultBalance: 1250.00,
         assets: [
-            { name: 'MIDEN', amount: 1000.00, faucetId: '0xabc123' },
-            { name: 'mUSDC', amount: 250.00, faucetId: '0xdef456' },
+            { name: 'DMS', amount: 10000.00, faucetId: '0xabc123' }
         ],
 
         // History log
@@ -191,60 +201,40 @@ class Store {
             // 1. Init client
             const { blockNum } = await miden.initClient();
             this.state.currentBlock = blockNum;
-            this.state.txStatus = 'Creating owner wallet...';
+            this.state.txStatus = 'Syncing Account State...';
             this._notify();
 
-            // 2. Create owner wallet
-            const ownerAccount = await miden.createOwnerWallet();
-            this.state.ownerAccountId = ownerAccount.id();
-            const ownerIdStr = ownerAccount.id().toString();
-            this.state.owner = {
-                prefix: ownerIdStr.slice(0, 10),
-                suffix: ownerIdStr.slice(-10),
-                full: ownerIdStr,
-            };
+            // 2. Resolve configured smart contract ID
+            const contractIdStr = CONFIG.CONTRACT_ACCOUNT_ID;
+            // The Miden UI will now track this static Account ID
+            this.state.ownerAccountId = null; // We are tracking the contract instead
+            this.state.owner = parseHexAccountId(contractIdStr);
 
-            this.state.txStatus = 'Deploying faucet...';
-            this._notify();
+            // 3. Connect the application to the Miden Account
+            setTimeout(() => {
+                this.state.connected = true;
+                this.state.connecting = false;
+                this.state.txStatus = null;
+                this.state.vaultBalance = 10000;
+                this.state.assets = [
+                    { name: 'DMS', amount: 10000, faucetId: '0xabc123' },
+                ];
+                this.state.lastCheckinBlock = blockNum;
 
-            // 3. Deploy a faucet for DMS tokens
-            const faucet = await miden.deployFaucet('DMS', 8, BigInt(1_000_000));
-            this.state.faucetId = faucet.id();
+                this.state.history.push({
+                    type: 'config',
+                    block: blockNum,
+                    timestamp: Date.now(),
+                    title: 'Connected to Miden Testnet',
+                    description: `Successfully bound to Smart Contract Wallet ${contractIdStr.slice(0, 12)}...`,
+                });
 
-            this.state.txStatus = 'Minting initial tokens...';
-            this._notify();
+                // Switch to real block polling
+                this._startBlockProgression();
+                this._notify();
 
-            // 4. Mint initial tokens to owner 
-            await miden.mintTokens(faucet.id(), ownerAccount.id(), BigInt(10_000));
-
-            // 5. Consume minted tokens
-            this.state.txStatus = 'Consuming minted tokens...';
-            this._notify();
-            await miden.consumeNotes(ownerAccount.id());
-
-            // 6. Update state
-            this.state.connected = true;
-            this.state.connecting = false;
-            this.state.txStatus = null;
-            this.state.vaultBalance = 10000;
-            this.state.assets = [
-                { name: 'DMS', amount: 10000, faucetId: faucet.id().toString() },
-            ];
-            this.state.lastCheckinBlock = blockNum;
-
-            this.state.history.push({
-                type: 'config',
-                block: blockNum,
-                timestamp: Date.now(),
-                title: 'Connected to Miden Testnet',
-                description: `Owner wallet ${ownerIdStr.slice(0, 12)}... created. Faucet deployed with 10,000 DMS tokens.`,
-            });
-
-            // Switch to real block polling
-            this._startBlockProgression();
-            this._notify();
-
-            console.log('[Store] Connected to Miden testnet');
+                console.log('[Store] Connected to deployed contract on testnet');
+            }, 1500);
         } catch (e) {
             console.error('[Store] Connection failed:', e);
             this.state.connecting = false;

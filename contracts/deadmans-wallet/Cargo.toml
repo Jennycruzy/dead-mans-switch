@@ -3,8 +3,18 @@ name = "deadmans-wallet"
 version = "0.1.0"
 edition = "2024"
 
+[package.metadata.component]
+package = "miden:deadmans-wallet"
+
+[package.metadata.miden]
+project-kind = "account"
+supported-types = ["RegularAccountUpdatableCode"]
+
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-miden-sdk = { workspace = true }
+miden = { workspace = true }
+miden-base = { workspace = true }
+miden-core = { workspace = true }
+miden-crypto = { workspace = true }

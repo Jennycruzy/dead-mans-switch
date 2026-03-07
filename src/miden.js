@@ -9,7 +9,6 @@
 let _sdk = null;
 let _client = null;
 let _prover = null;
-let _ownerAccount = null;
 let _lastSyncState = null;
 
 const RPC_ENDPOINT = 'https://rpc.testnet.miden.io';
@@ -61,42 +60,6 @@ export function getLastBlockNum() {
     return _lastSyncState ? _lastSyncState.blockNum() : null;
 }
 
-// ─── Account Management ────────────────────────────────────────────────────
-
-/**
- * Create a new wallet account (public, mutable) for the owner.
- * Returns the account object with .id().
- */
-export async function createOwnerWallet() {
-    if (!_client) throw new Error('Client not initialized');
-    const sdk = await loadSDK();
-    _ownerAccount = await _client.newWallet(
-        sdk.AccountStorageMode.public(),
-        true,  // mutable
-        sdk.AuthScheme.AuthRpoFalcon512,
-    );
-    console.log('[Miden] Owner wallet created:', _ownerAccount.id().toString());
-    return _ownerAccount;
-}
-
-/**
- * Create a new wallet for a beneficiary (public, mutable).
- */
-export async function createBeneficiaryWallet() {
-    if (!_client) throw new Error('Client not initialized');
-    const sdk = await loadSDK();
-    const beneficiary = await _client.newWallet(
-        sdk.AccountStorageMode.public(),
-        true,
-        sdk.AuthScheme.AuthRpoFalcon512,
-    );
-    console.log('[Miden] Beneficiary wallet created:', beneficiary.id().toString());
-    return beneficiary;
-}
-
-/**
- * Parse a beneficiary address string (bech32 mtst1...) to an AccountId.
- */
 export async function parseAddress(addressStr) {
     const sdk = await loadSDK();
     try {
@@ -105,13 +68,6 @@ export async function parseAddress(addressStr) {
         console.warn('[Miden] Failed to parse address:', addressStr, e);
         return null;
     }
-}
-
-/**
- * Get the stored owner account (if created in this session).
- */
-export function getOwnerAccount() {
-    return _ownerAccount;
 }
 
 // ─── Note Operations (P2ID / Dead Man's Switch) ────────────────────────────
@@ -279,7 +235,6 @@ export function getClient() {
 export function disconnect() {
     _client = null;
     _prover = null;
-    _ownerAccount = null;
     _lastSyncState = null;
     console.log('[Miden] Disconnected');
 }

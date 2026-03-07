@@ -1,0 +1,87 @@
+use miden::protocol::active_account
+use miden::protocol::native_account
+use miden::protocol::tx
+
+# -----------------------------------------------------------------------------
+# DEAD MAN'S SWITCH MASM CONTRACT
+# -----------------------------------------------------------------------------
+# Storage Slots:
+# 0: Beneficiary (Word)
+# 1: Heartbeat Blocks (Word - element 0 is the value)
+# 2: Last Checkin Block (Word - element 0 is the value)
+# 3: Is Active (Word - element 0 is 1 or 0)
+# -----------------------------------------------------------------------------
+
+pub proc check_in
+    exec.tx::get_block_number
+    push.0.0.0
+    push.2 
+    exec.native_account::set_item
+    dropw
+end
+
+pub proc configure
+    # Stack: [heartbeat_blocks, B3, B2, B1, B0]
+    dup.0
+    push.0.0.0
+    push.1
+    exec.native_account::set_item
+    dropw
+    drop
+
+    # Beneficiary
+    push.0
+    exec.native_account::set_item
+    dropw
+
+    # Is Active
+    push.1.0.0.0
+    push.3
+    exec.native_account::set_item
+    dropw
+
+    # Last Checkin
+    exec.tx::get_block_number
+    push.0.0.0
+    push.2
+    exec.native_account::set_item
+    dropw
+end
+
+pub proc is_expired
+    push.2
+    exec.active_account::get_item
+    movdn.3 drop drop drop # get V0 (last_checkin)
+    
+    push.1
+    exec.active_account::get_item
+    movdn.3 drop drop drop # get V0 (heartbeat)
+    
+    add
+    
+    exec.tx::get_block_number
+    
+    gt
+end
+
+pub proc claim
+    push.3
+    exec.active_account::get_item
+    movdn.3 drop drop drop
+    push.1 eq assert
+    
+    exec.is_expired
+    push.1 eq assert
+    
+    push.0.0.0.0
+    push.3
+    exec.native_account::set_item
+    dropw
+end
+
+pub proc set_heartbeat
+    push.0.0.0
+    push.1
+    exec.native_account::set_item
+    dropw
+end

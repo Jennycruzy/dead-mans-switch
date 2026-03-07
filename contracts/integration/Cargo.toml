@@ -12,8 +12,10 @@ name = "check-in"
 path = "src/bin/check_in.rs"
 
 [dependencies]
-miden-client = { workspace = true }
+miden-client = { version = "0.13", features = ["tonic"] }
 miden-protocol = { workspace = true }
 miden-standards = { workspace = true }
 miden-tx = { workspace = true }
+miden-client-sqlite-store = { workspace = true }
+rand = "0.10.0"
 tokio = { version = "1", features = ["full"] }

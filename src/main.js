@@ -10,22 +10,34 @@ import { renderDashboard } from './pages/dashboard.js';
 import { renderSetup } from './pages/setup.js';
 import { renderActivity } from './pages/activity.js';
 import { renderClaim } from './pages/claim.js';
+import { renderLogin } from './pages/login.js';
 
 // Initialize app
 function init() {
     const app = document.getElementById('app');
     app.className = 'app-layout';
 
-    // Render sidebar
+    // Render sidebar (hidden on login)
     renderSidebar(app);
 
     // Create main content area
     const main = document.createElement('main');
     main.id = 'page-content';
     main.className = 'main-content';
+
+    // Toggle sidebar visibility based on auth
+    window.addEventListener('hashchange', () => {
+        const isAuth = !!localStorage.getItem('dms_authenticated');
+        document.getElementById('sidebar').style.display = isAuth ? 'flex' : 'none';
+        const mobileHeader = document.querySelector('.mobile-header');
+        if (mobileHeader) mobileHeader.style.display = isAuth ? 'flex' : 'none';
+        main.style.marginLeft = isAuth ? 'var(--sidebar-width)' : '0';
+    });
+
     app.appendChild(main);
 
     // Register routes
+    registerRoute('/login', renderLogin);
     registerRoute('/dashboard', renderDashboard);
     registerRoute('/setup', renderSetup);
     registerRoute('/activity', renderActivity);

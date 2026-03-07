@@ -1,13 +1,32 @@
 [workspace]
 resolver = "2"
 members = [
-    "contracts/deadmans-wallet",
+    "deadmans-wallet",
     "integration",
 ]
 
 [workspace.dependencies]
-miden-sdk = "0.13"
-miden-client = "0.13"
-miden-protocol = "0.13"
-miden-standards = "0.13"
-miden-tx = "0.13"
+miden = { version = "0.10.0", default-features = false }
+miden-base = { version = "0.10.0", default-features = false }
+miden-base-macros = { version = "0.10.0", default-features = false }
+miden-field = { version = "0.10.0", default-features = false }
+miden-core = { version = "0.20", default-features = false }
+miden-crypto = { version = "0.19", default-features = false }
+winter-math = { version = "0.13", default-features = false }
+winter-utils = { version = "0.13", default-features = false }
+crypto-common = { version = "0.1", default-features = false }
+rand_hc = { version = "0.3", default-features = false }
+ed25519-dalek = { version = "2", default-features = false }
+k256 = { version = "0.13", default-features = false }
+chacha20poly1305 = { version = "0.10", default-features = false }
+flume = { version = "0.11", default-features = false }
+aead = { version = "0.5", default-features = false }
+cipher = { version = "0.4", default-features = false }
+digest = { version = "0.10", default-features = false }
+signature = { version = "2", default-features = false }
+universal-hash = { version = "0.5", default-features = false }
+miden-client = { version = "0.13", features = ["tonic"] }
+miden-protocol = { version = "0.13" }
+miden-standards = { version = "0.13" }
+miden-tx = { version = "0.13" }
+miden-client-sqlite-store = { version = "0.13" }

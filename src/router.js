@@ -11,6 +11,9 @@ export function registerRoute(path, renderFn) {
 }
 
 export function navigate(path) {
+    if (path !== '/login' && !localStorage.getItem('dms_authenticated')) {
+        path = '/login';
+    }
     window.location.hash = path;
 }
 
@@ -27,6 +30,12 @@ export function initRouter(containerSelector) {
         const renderFn = routes[path] || routes['/dashboard'];
 
         // Cleanup previous page
+        // Enforce auth
+        if (path !== '/login' && !localStorage.getItem('dms_authenticated')) {
+            navigate('/login');
+            return;
+        }
+
         if (currentCleanup && typeof currentCleanup === 'function') {
             currentCleanup();
             currentCleanup = null;
@@ -48,8 +57,8 @@ export function initRouter(containerSelector) {
     window.addEventListener('hashchange', render);
 
     // Initial render
-    if (!window.location.hash) {
-        window.location.hash = '/dashboard';
+    if (!window.location.hash || window.location.hash === '#/') {
+        navigate(localStorage.getItem('dms_authenticated') ? '/dashboard' : '/login');
     } else {
         render();
     }
