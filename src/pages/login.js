@@ -53,23 +53,36 @@ export function renderLogin(container) {
     </div>
   `;
 
-  // Temporary mocked login handler
+  // Simulated login handler that feels like a real OAuth popup flow
   const handleLogin = async (provider) => {
     const btns = container.querySelectorAll('.btn-social');
-    btns.forEach(b => b.classList.add('loading-state'));
 
-    // Simulate auth delay
-    await new Promise(r => setTimeout(r, 1000));
+    // Disable all buttons to prevent double-clicks
+    btns.forEach(b => {
+      b.style.pointerEvents = 'none';
+      b.style.opacity = '0.6';
+    });
+
+    // Add loading state to the clicked button
+    const targetBtn = Array.from(btns).find(b => b.innerText.includes(provider) || b.id.includes(provider.toLowerCase()));
+    if (targetBtn) {
+      targetBtn.classList.add('loading-state');
+      targetBtn.style.opacity = '1';
+      targetBtn.innerHTML = `Connecting to ${provider}...`;
+    }
+
+    // Simulate OAuth redirect / authentication delay
+    await new Promise(r => setTimeout(r, 2000));
 
     // Set a flag in local storage to simulate authentication
     localStorage.setItem('dms_authenticated', 'true');
     localStorage.setItem('dms_provider', provider);
 
-    showToast(`Successfully logged in with ${provider}`, 'success');
+    showToast(`Successfully authenticated via ${provider}`, 'success');
     navigate('/dashboard');
   };
 
   container.querySelector('#btn-login-google').addEventListener('click', () => handleLogin('Google'));
   container.querySelector('#btn-login-apple').addEventListener('click', () => handleLogin('Apple'));
-  container.querySelector('#btn-login-demo').addEventListener('click', () => handleLogin('Demo'));
+  container.querySelector('#btn-login-demo').addEventListener('click', () => handleLogin('Demo Mode'));
 }

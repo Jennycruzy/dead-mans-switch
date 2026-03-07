@@ -199,7 +199,21 @@ class Store {
 
         try {
             // 1. Init client
-            const { blockNum } = await miden.initClient();
+            const { client, blockNum } = await miden.initClient();
+
+            // If the client failed to initialize (e.g., due to local dev server WASM worker errors),
+            // gracefully degrade to Demo Mode instead of stalling.
+            if (!client) {
+                console.warn('[Store] Miden Client initialization failed. Falling back to Demo Mode.');
+                this.state.connected = false;
+                this.state.connecting = false;
+                this.state.txStatus = null;
+                this.state.lastCheckinBlock = blockNum;
+                this._startBlockProgression();
+                this._notify();
+                return;
+            }
+
             this.state.currentBlock = blockNum;
             this.state.txStatus = 'Syncing Account State...';
             this._notify();
@@ -234,7 +248,7 @@ class Store {
                 this._notify();
 
                 console.log('[Store] Connected to deployed contract on testnet');
-            }, 1500);
+            }, 1000); // Slight artificial delay for UX smoothness
         } catch (e) {
             console.error('[Store] Connection failed:', e);
             this.state.connecting = false;

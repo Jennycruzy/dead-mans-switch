@@ -36,12 +36,28 @@ async function loadSDK() {
  */
 export async function initClient() {
     const sdk = await loadSDK();
-    _client = await sdk.WebClient.createClient(RPC_ENDPOINT);
-    _prover = sdk.TransactionProver.newLocalProver();
-    _lastSyncState = await _client.syncState();
-    const blockNum = _lastSyncState.blockNum();
-    console.log('[Miden] Connected — latest block:', blockNum);
-    return { client: _client, blockNum };
+
+    try {
+        // Race the WebClient constructor against a 5-second timeout.
+        // If it hangs (e.g., due to local dev server missing COOP headers for WASM), fallback gracefully.
+        _client = await Promise.race([
+            sdk.WebClient.createClient(RPC_ENDPOINT),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Miden WebClient initialization timeout')), 5000))
+        ]);
+
+        // Set up a local prover for off-chain ZK generation
+        _prover = sdk.TransactionProver.newLocalProver();
+
+        _lastSyncState = await _client.syncState();
+        const blockNum = _lastSyncState.blockNum();
+        console.log('[Miden] Connected — latest block:', blockNum);
+        return { client: _client, blockNum };
+    } catch (error) {
+        console.error('[Miden] WebClient Initialization Error – Falling back to un-synced block.', error);
+        // Clean up partial state
+        _client = null;
+        return { client: null, blockNum: 1000000 };
+    }
 }
 
 /**
