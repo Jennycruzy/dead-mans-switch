@@ -53,36 +53,105 @@ export function renderLogin(container) {
     </div>
   `;
 
-  // Simulated login handler that feels like a real OAuth popup flow
-  const handleLogin = async (provider) => {
-    const btns = container.querySelectorAll('.btn-social');
+  // Create Mock OAuth Modal
+  const modalHTML = `
+    <div class="mock-modal-overlay" id="mock-login-modal">
+      <div class="mock-modal">
+        <div class="mock-modal-header">
+          <h2 class="mock-modal-title" id="mock-login-title">Sign In</h2>
+          <p class="mock-modal-subtitle" id="mock-login-subtitle">Enter your credentials to continue</p>
+        </div>
+        <form id="mock-login-form">
+          <input type="email" class="mock-input" id="mock-login-input" placeholder="Email address" required autocomplete="off" />
+          <button type="submit" class="btn btn-primary" style="width: 100%" id="mock-login-submit">
+            Continue
+          </button>
+          <button type="button" class="btn btn-ghost" style="width: 100%; margin-top: var(--space-sm);" id="mock-login-cancel">
+            Cancel
+          </button>
+        </form>
+      </div>
+    </div>
+  `;
+  container.insertAdjacentHTML('beforeend', modalHTML);
 
-    // Disable all buttons to prevent double-clicks
-    btns.forEach(b => {
-      b.style.pointerEvents = 'none';
-      b.style.opacity = '0.6';
-    });
+  const modal = container.querySelector('#mock-login-modal');
+  const titleEl = container.querySelector('#mock-login-title');
+  const inputEl = container.querySelector('#mock-login-input');
+  const formEl = container.querySelector('#mock-login-form');
+  const cancelBtn = container.querySelector('#mock-login-cancel');
+  const submitBtn = container.querySelector('#mock-login-submit');
 
-    // Add loading state to the clicked button
-    const targetBtn = Array.from(btns).find(b => b.innerText.includes(provider) || b.id.includes(provider.toLowerCase()));
-    if (targetBtn) {
-      targetBtn.classList.add('loading-state');
-      targetBtn.style.opacity = '1';
-      targetBtn.innerHTML = `Connecting to ${provider}...`;
+  let activeProvider = null;
+
+  // Open the modal
+  const openModal = (provider) => {
+    activeProvider = provider;
+    titleEl.textContent = `Sign in with ${provider}`;
+    inputEl.value = '';
+
+    if (provider === 'Demo Mode') {
+      inputEl.value = 'demo@miden.test';
+      inputEl.disabled = true;
+    } else {
+      inputEl.disabled = false;
+      inputEl.focus();
     }
 
-    // Simulate OAuth redirect / authentication delay
-    await new Promise(r => setTimeout(r, 2000));
+    modal.classList.add('active');
+  };
+
+  // Close the modal
+  const closeModal = () => {
+    modal.classList.remove('active');
+    activeProvider = null;
+
+    // Reset buttons
+    const btns = container.querySelectorAll('.btn-social');
+    btns.forEach(b => {
+      b.style.pointerEvents = 'auto';
+      b.style.opacity = '1';
+    });
+  };
+
+  cancelBtn.addEventListener('click', closeModal);
+
+  // Handle actual form submission (simulating OAuth completion)
+  formEl.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!activeProvider) return;
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `Verifying...`;
+
+    // Simulate API delay
+    await new Promise(r => setTimeout(r, 1500));
 
     // Set a flag in local storage to simulate authentication
     localStorage.setItem('dms_authenticated', 'true');
-    localStorage.setItem('dms_provider', provider);
+    localStorage.setItem('dms_provider', activeProvider);
+    localStorage.setItem('dms_user', inputEl.value);
 
-    showToast(`Successfully authenticated via ${provider}`, 'success');
+    showToast(`Successfully authenticated as ${inputEl.value}`, 'success');
     navigate('/dashboard');
+  });
+
+  // Attach button listeners to open the modal instead of instantly logging in
+  const handleButtonClick = (provider, btnId) => {
+    const btn = container.querySelector(btnId);
+    btn.addEventListener('click', () => {
+      // Disable other buttons temporarily
+      const btns = container.querySelectorAll('.btn-social');
+      btns.forEach(b => {
+        b.style.pointerEvents = 'none';
+        b.style.opacity = '0.6';
+      });
+      btn.style.opacity = '1';
+      openModal(provider);
+    });
   };
 
-  container.querySelector('#btn-login-google').addEventListener('click', () => handleLogin('Google'));
-  container.querySelector('#btn-login-apple').addEventListener('click', () => handleLogin('Apple'));
-  container.querySelector('#btn-login-demo').addEventListener('click', () => handleLogin('Demo Mode'));
+  handleButtonClick('Google', '#btn-login-google');
+  handleButtonClick('Apple', '#btn-login-apple');
+  handleButtonClick('Demo Mode', '#btn-login-demo');
 }
