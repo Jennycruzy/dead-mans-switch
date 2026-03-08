@@ -1,12 +1,10 @@
 /**
  * Dead Man's Switch — Data Store
- * 
- * Manages wallet state for the Dead Man's Switch on Miden.
+ * * Manages wallet state for the Dead Man's Switch on Miden.
  * Supports two modes:
- *   • Demo mode (default): localStorage simulation with fake block progression
- *   • Connected mode: Real Miden SDK operations via miden.js wrapper
- * 
- * The interface stays the same regardless of mode — pages don't need
+ * • Demo mode (default): localStorage simulation with fake block progression
+ * • Connected mode: Real Miden SDK operations via miden.js wrapper
+ * * The interface stays the same regardless of mode — pages don't need
  * to know which mode is active.
  */
 
@@ -39,8 +37,6 @@ function parseHexAccountId(hexId) {
 }
 
 function getDefaultState() {
-    const owner = parseHexAccountId(CONFIG.CONTRACT_ACCOUNT_ID);
-    const beneficiary = generateAccountId();
     return {
         // Connection state
         connected: false,
@@ -53,8 +49,8 @@ function getDefaultState() {
         faucetId: null,
 
         // Display identifiers
-        owner,
-        beneficiary,
+        owner: { prefix: '', suffix: '', full: null },
+        beneficiary: { prefix: '', suffix: '', full: null },
 
         // Switch params
         heartbeatBlocks: DEFAULT_HEARTBEAT_BLOCKS,
@@ -62,28 +58,11 @@ function getDefaultState() {
         lastCheckinBlock: 1_000_000,
 
         // Assets
-        vaultBalance: 1250.00,
-        assets: [
-            { name: 'DMS', amount: 10000.00, faucetId: '0xabc123' }
-        ],
+        vaultBalance: 0.00,
+        assets: [],
 
         // History log
-        history: [
-            {
-                type: 'config',
-                block: 999_000,
-                timestamp: Date.now() - 86400000 * 8,
-                title: 'Wallet Created',
-                description: 'Dead Man\'s Switch wallet initialized with beneficiary configured',
-            },
-            {
-                type: 'checkin',
-                block: 1_000_000,
-                timestamp: Date.now() - 86400000 * 7,
-                title: 'Initial Check-In',
-                description: 'First heartbeat P2ID note created',
-            },
-        ],
+        history: [],
         claimed: false,
 
         // Transaction status
@@ -186,11 +165,42 @@ class Store {
     // ─── Connection Management ──────────────────────────────────────────────
 
     /**
-     * Connect to Miden testnet via the SDK.
-     * Creates owner wallet, deploys faucet, mints initial tokens.
+     * Connect to Miden testnet via the SDK utilizing the user's bound Personal Account ID.
      */
     async connect() {
         if (this.state.connected || this.state.connecting) return;
+
+        // Check if user is authenticated via Express Backend
+        const dmsToken = localStorage.getItem('dms_token');
+        if (!dmsToken) {
+            this.state.connectionError = 'Please sign in first.';
+            this._notify();
+            return;
+        }
+
+        // Fetch their bound Miden Account from the Database
+        let userAccountId = localStorage.getItem('dms_miden_account_id');
+        if (!userAccountId) {
+            try {
+                const res = await fetch('/api/account/me', {
+                    headers: { 'Authorization': `Bearer ${dmsToken}` }
+                });
+                const data = await res.json();
+                if (data.miden_account_id) {
+                    userAccountId = data.miden_account_id;
+                    localStorage.setItem('dms_miden_account_id', userAccountId);
+                } else {
+                    this.state.connectionError = 'No Miden Wallet connected to this profile. Please bind a wallet in Setup.';
+                    this._notify();
+                    return;
+                }
+            } catch (err) {
+                console.error('Failed to fetch account config:', err);
+                this.state.connectionError = 'Network error fetching wallet profile.';
+                this._notify();
+                return;
+            }
+        }
 
         this.state.connecting = true;
         this.state.connectionError = null;
@@ -201,8 +211,8 @@ class Store {
             // 1. Init client
             const { client, blockNum } = await miden.initClient();
 
-            // If the client failed to initialize (e.g., due to local dev server WASM worker errors),
-            // gracefully degrade to Demo Mode instead of stalling.
+            // If the client failed to initialize (e.g., local dev WASM header errors),
+            // gracefully degrade to Demo Mode
             if (!client) {
                 console.warn('[Store] Miden Client initialization failed. Falling back to Demo Mode.');
                 this.state.connected = false;
@@ -215,62 +225,60 @@ class Store {
             }
 
             this.state.currentBlock = blockNum;
-            this.state.txStatus = 'Syncing Account State...';
+            this.state.txStatus = 'Synchronizing Personal Account...';
             this._notify();
 
-            // 2. Resolve configured smart contract ID
-            const contractIdStr = CONFIG.CONTRACT_ACCOUNT_ID;
-            // The Miden UI will now track this static Account ID
-            this.state.ownerAccountId = null; // We are tracking the contract instead
-            this.state.owner = parseHexAccountId(contractIdStr);
+            // 2. Resolve the user's specific Account ID
+            const parsedId = parseHexAccountId(userAccountId);
+            this.state.ownerAccountId = await miden.parseAddress(userAccountId); // Store actual SDK struct
+            this.state.owner = parsedId;
 
-            // 3. Connect the application to the Miden Account
+            // 3. Connect UI
             setTimeout(() => {
                 this.state.connected = true;
                 this.state.connecting = false;
                 this.state.txStatus = null;
                 this.state.vaultBalance = 10000;
-                this.state.assets = [
-                    { name: 'DMS', amount: 10000, faucetId: '0xabc123' },
-                ];
+                this.state.assets = [{ name: 'DMS', amount: 10000, faucetId: '0xabc123' }];
                 this.state.lastCheckinBlock = blockNum;
 
                 this.state.history.push({
                     type: 'config',
                     block: blockNum,
                     timestamp: Date.now(),
-                    title: 'Connected to Miden Testnet',
-                    description: `Successfully bound to Smart Contract Wallet ${contractIdStr.slice(0, 12)}...`,
+                    title: 'Wallet Connected',
+                    description: `Synchronized Personal Miden Testnet Account ${parsedId.prefix}...`,
                 });
 
-                // Switch to real block polling
                 this._startBlockProgression();
                 this._notify();
 
-                console.log('[Store] Connected to deployed contract on testnet');
-            }, 1000); // Slight artificial delay for UX smoothness
+                console.log('[Store] Connected to personal Miden account:', userAccountId);
+            }, 1000);
         } catch (e) {
             console.error('[Store] Connection failed:', e);
             this.state.connecting = false;
-            this.state.connectionError = e.message || 'Failed to connect';
+            this.state.connectionError = e.message || 'Failed to connect SDK to account';
             this.state.txStatus = null;
             this._notify();
         }
     }
 
     /**
-     * Disconnect from the network. Returns to demo mode.
+     * Disconnect from the network. Returns to a clean demo mode.
      */
     disconnect() {
-        miden.disconnect();
-        this.state.connected = false;
-        this.state.connecting = false;
-        this.state.connectionError = null;
-        this.state.ownerAccountId = null;
-        this.state.beneficiaryAccountId = null;
-        this.state.faucetId = null;
-        this.state.txPending = false;
-        this.state.txStatus = null;
+        if (this.state.connected) {
+            miden.disconnect();
+        }
+
+        // Remove the stored Miden account so it doesn't auto-reconnect to the same one
+        localStorage.removeItem('dms_miden_account_id');
+
+        // Reset the state to the clean default (wipes balances, history, beneficiary)
+        this.state = getDefaultState();
+
+        this._save();
         this._startBlockProgression();
         this._notify();
     }
@@ -424,7 +432,16 @@ class Store {
         if (this.state.connected) {
             miden.disconnect();
         }
+
+        // Wipe all browser storage to guarantee a fresh experience
+        localStorage.removeItem('dms_state');
+        localStorage.removeItem('dms_authenticated');
+        localStorage.removeItem('dms_token');
+        localStorage.removeItem('dms_user');
+        localStorage.removeItem('dms_miden_account_id');
+
         this.state = getDefaultState();
+        this._save();
         this._startBlockProgression();
         this._notify();
     }

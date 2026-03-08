@@ -4,9 +4,11 @@
  * When connected to Miden, accepts bech32 addresses and performs on-chain operations.
  */
 
+
 import store from '../store.js';
 import { showToast } from '../components/toast.js';
 import { showModal } from '../components/modal.js';
+import { navigate } from '../router.js';
 
 const PRESET_INTERVALS = [
   { label: '🗓️ Weekly', blocks: 201600, primary: true },
@@ -22,23 +24,45 @@ export function renderSetup(container) {
   const isConnected = state.connected;
 
   container.innerHTML = `
-    <div class="page-header">
-      <h1 class="page-title">Configuration</h1>
-      <p class="page-subtitle">Set up your Dead Man's Switch parameters. Changes take effect on the next check-in.</p>
+    <div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
+      <div>
+        <h1 class="page-title">Configuration</h1>
+        <p class="page-subtitle">Set up your Dead Man's Switch parameters. Changes take effect on the next check-in.</p>
+      </div>
+      <button class="btn btn-ghost" id="btn-logout" style="border: 1px solid var(--surface-border); margin-top: 10px;">
+        🚪 Log Out
+      </button>
     </div>
 
-    <!-- Current Config -->
-    <div class="section">
+    ${!state.ownerAccountId && (!state.owner || !state.owner.full || state.owner.full === '0xundefined') ? `
+    <div class="section" id="bind-wallet-section">
+      <h3 class="section-title" style="color: var(--accent);">🔗 Connect Miden Wallet</h3>
+      <div class="card" style="border-color: rgba(99, 102, 241, 0.5); background: rgba(99, 102, 241, 0.05);">
+        <p class="text-sm" style="margin-bottom: var(--space-md);">
+          Your profile is active, but you haven't linked a Miden Testnet Account ID yet. Enter your Account ID to sync your wallet.
+        </p>
+        <div class="input-group">
+          <label for="bind-account-id">Account ID (Hex or Bech32)</label>
+          <input type="text" class="input" id="bind-account-id" placeholder="0x..." style="font-family: monospace;" />
+        </div>
+        <button class="btn btn-primary mt-sm" id="btn-bind-wallet" style="width: 100%;">
+          Bind Wallet & Connect
+        </button>
+      </div>
+    </div>
+    ` : ''}
+
+    <div class="section" style="${!state.ownerAccountId && (!state.owner || !state.owner.full || state.owner.full === '0xundefined') ? 'opacity: 0.5; pointer-events: none;' : ''}">
       <h3 class="section-title">Current Configuration</h3>
       <div class="card">
         <div class="config-display">
           <div class="config-row">
             <span class="config-key">Owner Account</span>
-            <span class="config-value">${state.owner.full || (state.owner.prefix + '...' + state.owner.suffix)}</span>
+            <span class="config-value" style="font-family: monospace;">${state.owner.full || (state.owner.prefix + '...' + state.owner.suffix) || 'Not Bound'}</span>
           </div>
           <div class="config-row">
             <span class="config-key">Beneficiary Account</span>
-            <span class="config-value">${state.beneficiary.full || (state.beneficiary.prefix + '...' + state.beneficiary.suffix)}</span>
+            <span class="config-value" style="font-family: monospace;">${state.beneficiary.full || (state.beneficiary.prefix + '...' + state.beneficiary.suffix)}</span>
           </div>
           <div class="config-row">
             <span class="config-key">Heartbeat Interval</span>
@@ -56,14 +80,13 @@ export function renderSetup(container) {
             <span class="config-key">Mode</span>
             <span class="config-value">${isConnected
       ? '<span class="badge badge-alive" style="font-size:0.65rem;padding:2px 8px;"><span class="badge-dot"></span> On-Chain</span>'
-      : '<span class="badge" style="font-size:0.65rem;padding:2px 8px;background:var(--surface-border);color:var(--text-muted);">Demo</span>'
+      : '<span class="badge" style="font-size:0.65rem;padding:2px 8px;background:var(--surface-border);color:var(--text-muted);">Disconnected</span>'
     }</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Update Config -->
     <div class="section">
       <h3 class="section-title">Update Configuration</h3>
       <div class="card">
@@ -118,7 +141,6 @@ export function renderSetup(container) {
       </div>
     </div>
 
-    <!-- Danger Zone -->
     <div class="section">
       <h3 class="section-title" style="color: var(--status-expired);">Danger Zone</h3>
       <div class="card" style="border-color: rgba(248, 113, 113, 0.2);">
@@ -132,6 +154,48 @@ export function renderSetup(container) {
       </div>
     </div>
   `;
+
+  // Handle Binding a Miden Wallet
+  const bindBtn = container.querySelector('#btn-bind-wallet');
+  if (bindBtn) {
+    bindBtn.addEventListener('click', async () => {
+      const accountId = container.querySelector('#bind-account-id').value.trim();
+      if (!accountId) {
+        showToast('Please enter an Account ID to bind.', 'error');
+        return;
+      }
+
+      bindBtn.disabled = true;
+      bindBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="margin-right: 8px;"></span> Binding...';
+
+      try {
+        const token = localStorage.getItem('dms_token');
+        const res = await fetch('/api/account/bind', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ midenAccountId: accountId })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to bind wallet');
+
+        localStorage.setItem('dms_miden_account_id', accountId);
+        showToast('Wallet bound successfully! Connecting...', 'success');
+
+        // Refresh Setup screen and let store connect
+        renderSetup(container);
+        store.connect();
+
+      } catch (err) {
+        showToast(err.message, 'error');
+        bindBtn.disabled = false;
+        bindBtn.textContent = 'Bind Wallet & Connect';
+      }
+    });
+  }
 
   // Preset buttons
   const presetGroup = container.querySelector('#preset-group');
@@ -238,11 +302,21 @@ export function renderSetup(container) {
           class: 'btn-danger',
           onClick: () => {
             store.resetWallet();
-            showToast('Wallet has been reset.', 'info');
-            renderSetup(container);
+            showToast('Wallet has been reset. Please sign in again.', 'info');
+            navigate('/login');
           },
         },
       ],
     });
   });
+
+  // Log Out Button (New)
+  const logoutBtn = container.querySelector('#btn-logout');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      store.resetWallet();
+      showToast('Logged out successfully.', 'info');
+      navigate('/login');
+    });
+  }
 }

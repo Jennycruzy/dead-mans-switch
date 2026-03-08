@@ -51,7 +51,13 @@ export function renderSidebar(container) {
       </div>
     </div>
     <div class="sidebar-nav" id="sidebar-nav"></div>
+    
     <div class="sidebar-footer">
+      <button id="sidebar-logout-btn" class="nav-link" style="width: 100%; margin-bottom: 16px; justify-content: flex-start; opacity: 0.8;">
+        <span class="nav-icon">🚪</span>
+        <span class="nav-label">Log Out</span>
+      </button>
+
       <div class="wallet-badge" id="wallet-badge">
         <span class="wallet-badge-dot" id="wallet-badge-dot"></span>
         <span id="wallet-id"></span>
@@ -101,6 +107,16 @@ export function renderSidebar(container) {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeMobileSidebar();
   });
+
+  // ─── Log Out Logic ────────────────────────────────────────────────
+  const logoutBtn = sidebar.querySelector('#sidebar-logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      store.resetWallet();
+      navigate('/login');
+      closeMobileSidebar(); // Ensures the menu closes on mobile devices
+    });
+  }
 
   // ─── Live-update wallet badge & connection status ─────────────────
   function updateFooter() {

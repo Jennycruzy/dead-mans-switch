@@ -53,20 +53,33 @@ export function renderLogin(container) {
     </div>
   `;
 
-  // Create Mock OAuth Modal
+  // Create Authentic Backend Modal
   const modalHTML = `
     <div class="mock-modal-overlay" id="mock-login-modal">
       <div class="mock-modal">
         <div class="mock-modal-header">
-          <h2 class="mock-modal-title" id="mock-login-title">Sign In</h2>
-          <p class="mock-modal-subtitle" id="mock-login-subtitle">Enter your credentials to continue</p>
+          <h2 class="mock-modal-title" id="auth-title">Sign In</h2>
+          <p class="mock-modal-subtitle" id="auth-subtitle">Enter your credentials to continue</p>
         </div>
-        <form id="mock-login-form">
-          <input type="email" class="mock-input" id="mock-login-input" placeholder="Email address" required autocomplete="off" />
-          <button type="submit" class="btn btn-primary" style="width: 100%" id="mock-login-submit">
-            Continue
+        <form id="auth-form" class="auth-form">
+          <div class="input-group" style="margin-bottom: var(--space-sm);">
+            <label for="auth-email">Email Address</label>
+            <input type="email" class="input" id="auth-email" placeholder="you@example.com" required autocomplete="email" />
+          </div>
+          <div class="input-group" style="margin-bottom: var(--space-lg);">
+            <label for="auth-password">Password</label>
+            <input type="password" class="input" id="auth-password" placeholder="••••••••" required autocomplete="current-password" />
+          </div>
+          
+          <button type="submit" class="btn btn-primary" style="width: 100%" id="auth-submit">
+            Sign In
           </button>
-          <button type="button" class="btn btn-ghost" style="width: 100%; margin-top: var(--space-sm);" id="mock-login-cancel">
+          
+          <div style="text-align: center; margin-top: var(--space-md);">
+            <a href="#" id="auth-toggle-mode" style="font-size: 0.85rem;">Need an account? Register instead</a>
+          </div>
+
+          <button type="button" class="btn btn-ghost" style="width: 100%; margin-top: var(--space-sm);" id="auth-cancel">
             Cancel
           </button>
         </form>
@@ -76,29 +89,56 @@ export function renderLogin(container) {
   container.insertAdjacentHTML('beforeend', modalHTML);
 
   const modal = container.querySelector('#mock-login-modal');
-  const titleEl = container.querySelector('#mock-login-title');
-  const inputEl = container.querySelector('#mock-login-input');
-  const formEl = container.querySelector('#mock-login-form');
-  const cancelBtn = container.querySelector('#mock-login-cancel');
-  const submitBtn = container.querySelector('#mock-login-submit');
+  const titleEl = container.querySelector('#auth-title');
+  const subtitleEl = container.querySelector('#auth-subtitle');
+  const emailEl = container.querySelector('#auth-email');
+  const passwordEl = container.querySelector('#auth-password');
+  const formEl = container.querySelector('#auth-form');
+  const cancelBtn = container.querySelector('#auth-cancel');
+  const submitBtn = container.querySelector('#auth-submit');
+  const toggleModeBtn = container.querySelector('#auth-toggle-mode');
 
   let activeProvider = null;
+  let isRegisterMode = false;
+
+  // Toggle between Login and Register modes
+  toggleModeBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    isRegisterMode = !isRegisterMode;
+
+    if (isRegisterMode) {
+      titleEl.textContent = 'Create Account';
+      subtitleEl.textContent = 'Register a new profile to secure your assets';
+      submitBtn.textContent = 'Register';
+      toggleModeBtn.textContent = 'Already have an account? Sign In';
+    } else {
+      titleEl.textContent = `Sign in with ${activeProvider || 'Email'}`;
+      subtitleEl.textContent = 'Enter your credentials to continue';
+      submitBtn.textContent = 'Sign In';
+      toggleModeBtn.textContent = 'Need an account? Register instead';
+    }
+  });
 
   // Open the modal
   const openModal = (provider) => {
     activeProvider = provider;
+    isRegisterMode = false;
     titleEl.textContent = `Sign in with ${provider}`;
-    inputEl.value = '';
+    subtitleEl.textContent = 'Enter your credentials to continue';
+    submitBtn.textContent = 'Sign In';
+    toggleModeBtn.textContent = 'Need an account? Register instead';
 
+    emailEl.value = '';
+    passwordEl.value = '';
+
+    // In Demo mode, populate with fake credentials for ease of testing
     if (provider === 'Demo Mode') {
-      inputEl.value = 'demo@miden.test';
-      inputEl.disabled = true;
-    } else {
-      inputEl.disabled = false;
-      inputEl.focus();
+      emailEl.value = 'demo@miden.test';
+      passwordEl.value = 'password123';
     }
 
     modal.classList.add('active');
+    emailEl.focus();
   };
 
   // Close the modal
@@ -116,29 +156,54 @@ export function renderLogin(container) {
 
   cancelBtn.addEventListener('click', closeModal);
 
-  // Handle actual form submission (simulating OAuth completion)
+  // Handle true backend submission
   formEl.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!activeProvider) return;
+
+    const email = emailEl.value;
+    const password = passwordEl.value;
 
     submitBtn.disabled = true;
-    submitBtn.innerHTML = `Verifying...`;
+    submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="margin-right: 8px;"></span> ${isRegisterMode ? 'Creating Account...' : 'Authenticating...'}`;
 
-    // Simulate API delay
-    await new Promise(r => setTimeout(r, 1500));
+    try {
+      const endpoint = isRegisterMode ? '/api/register' : '/api/login';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
 
-    // Set a flag in local storage to simulate authentication
-    localStorage.setItem('dms_authenticated', 'true');
-    localStorage.setItem('dms_provider', activeProvider);
-    localStorage.setItem('dms_user', inputEl.value);
+      const data = await response.json();
 
-    showToast(`Successfully authenticated as ${inputEl.value}`, 'success');
-    navigate('/dashboard');
+      if (!response.ok) {
+        throw new Error(data.error || 'Authentication failed');
+      }
+
+      // Store authentic credentials
+      localStorage.setItem('dms_authenticated', 'true');
+      localStorage.setItem('dms_token', data.token);
+      localStorage.setItem('dms_user', data.user.email);
+      if (data.user.miden_account_id) {
+        localStorage.setItem('dms_miden_account_id', data.user.miden_account_id);
+      } else {
+        localStorage.removeItem('dms_miden_account_id');
+      }
+
+      showToast(isRegisterMode ? 'Account registered successfully!' : `Welcome back, ${data.user.email}`, 'success');
+      navigate('/dashboard');
+
+    } catch (err) {
+      showToast(err.message, 'error');
+      submitBtn.disabled = false;
+      submitBtn.textContent = isRegisterMode ? 'Register' : 'Sign In';
+    }
   });
 
   // Attach button listeners to open the modal instead of instantly logging in
   const handleButtonClick = (provider, btnId) => {
     const btn = container.querySelector(btnId);
+    if (!btn) return;
     btn.addEventListener('click', () => {
       // Disable other buttons temporarily
       const btns = container.querySelectorAll('.btn-social');
