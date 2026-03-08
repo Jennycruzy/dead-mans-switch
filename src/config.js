@@ -12,4 +12,4 @@ export const CONFIG = {
 // and uses your live Render backend when hosted on Vercel.
 export const API_BASE_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:3000'
-    : 'https://YOUR_BACKEND_NAME.onrender.com'; // ⚠️ Replace this with your actual Render URL once deployed
+    : 'https://dead-mans-switch-xa39.onrender.com'; // ⚠️ Replace this with your actual Render URL once deployed
