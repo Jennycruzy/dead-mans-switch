@@ -4,11 +4,11 @@
  * When connected to Miden, accepts bech32 addresses and performs on-chain operations.
  */
 
-
 import store from '../store.js';
 import { showToast } from '../components/toast.js';
 import { showModal } from '../components/modal.js';
 import { navigate } from '../router.js';
+import { API_BASE_URL } from '../config.js'; // <-- NEW IMPORT
 
 const PRESET_INTERVALS = [
   { label: '🗓️ Weekly', blocks: 201600, primary: true },
@@ -170,7 +170,8 @@ export function renderSetup(container) {
 
       try {
         const token = localStorage.getItem('dms_token');
-        const res = await fetch('/api/account/bind', {
+        // ⚠️ USE THE NEW SMART URL HERE
+        const res = await fetch(`${API_BASE_URL}/api/account/bind`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -310,7 +311,7 @@ export function renderSetup(container) {
     });
   });
 
-  // Log Out Button (New)
+  // Log Out Button
   const logoutBtn = container.querySelector('#btn-logout');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {

@@ -15,7 +15,17 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dead-mans-switch-super-secret-key-2026';
 
 // Middleware
-app.use(cors());
+// CORS Configuration to allow Vercel and Localhost to talk to this backend
+app.use(cors({
+    origin: [
+        'http://localhost:5173', // For your local development testing
+        'https://dead-mans-switch-woad.vercel.app' // IMPORTANT: Replace this with your actual Vercel URL
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 
 // Ensure data directory exists
@@ -188,5 +198,5 @@ app.get('/api/account/me', authenticateToken, async (req, res) => {
 
 // Start Server
 app.listen(PORT, () => {
-    console.log(`Backend server running on http://localhost:${PORT}`);
+    console.log(`Backend server running on port ${PORT}`);
 });

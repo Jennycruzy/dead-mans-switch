@@ -6,6 +6,7 @@
 import store from '../store.js';
 import { navigate } from '../router.js';
 import { showToast } from '../components/toast.js';
+import { API_BASE_URL } from '../config.js'; // <-- NEW IMPORT
 
 export function renderLogin(container) {
   container.innerHTML = `
@@ -167,8 +168,9 @@ export function renderLogin(container) {
     submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="margin-right: 8px;"></span> ${isRegisterMode ? 'Creating Account...' : 'Authenticating...'}`;
 
     try {
+      // ⚠️ USE THE NEW SMART URL HERE
       const endpoint = isRegisterMode ? '/api/register' : '/api/login';
-      const response = await fetch(endpoint, {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })

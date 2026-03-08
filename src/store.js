@@ -9,6 +9,7 @@
  */
 
 import * as miden from './miden.js';
+import { CONFIG, API_BASE_URL } from './config.js'; // <-- NEW IMPORT
 
 const BLOCKS_PER_DAY = 28800;
 const DEFAULT_HEARTBEAT_BLOCKS = 201600; // ~7 days
@@ -18,8 +19,6 @@ export const PERIOD_PRESETS = {
     monthly: { label: 'Monthly', blocks: 864_000, days: 30 },
     yearly: { label: 'Yearly', blocks: 10_512_000, days: 365 },
 };
-
-import { CONFIG } from './config.js';
 
 function generateAccountId() {
     const prefix = '0x' + Array.from({ length: 8 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
@@ -182,7 +181,8 @@ class Store {
         let userAccountId = localStorage.getItem('dms_miden_account_id');
         if (!userAccountId) {
             try {
-                const res = await fetch('/api/account/me', {
+                // ⚠️ USE THE NEW SMART URL HERE
+                const res = await fetch(`${API_BASE_URL}/api/account/me`, {
                     headers: { 'Authorization': `Bearer ${dmsToken}` }
                 });
                 const data = await res.json();
