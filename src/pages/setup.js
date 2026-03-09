@@ -37,7 +37,7 @@ export function renderSetup(container) {
     ${!state.ownerAccountId && (!state.owner || !state.owner.full || state.owner.full === '0xundefined') ? `
     <div class="section" id="bind-wallet-section">
       <h3 class="section-title" style="color: var(--accent);">🔗 Connect Miden Wallet</h3>
-      <div class="card" style="border-color: rgba(99, 102, 241, 0.5); background: rgba(99, 102, 241, 0.05);">
+      <div class="card" style="border-color: rgba(255, 90, 0, 0.5); background: rgba(255, 90, 0, 0.05);">
         <p class="text-sm" style="margin-bottom: var(--space-md);">
           Your profile is active, but you haven't linked a Miden Testnet Account ID yet. Enter your Account ID to sync your wallet.
         </p>
