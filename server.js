@@ -19,7 +19,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dead-mans-switch-super-secret-key-
 app.use(cors({
     origin: [
         'http://localhost:5173', // For your local development testing
-        'https://dead-mans-switch-woad.vercel.app' // IMPORTANT: Replace this with your actual Vercel URL
+        'https://dead-mans-wallet-switch.vercel.app/' // IMPORTANT: Replace this with your actual Vercel URL
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
