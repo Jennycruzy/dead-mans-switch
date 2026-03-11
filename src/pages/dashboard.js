@@ -10,6 +10,9 @@ import { createCountdownRing } from '../components/countdown.js';
 import { showToast } from '../components/toast.js';
 
 export function renderDashboard(container) {
+  // Local state to track privacy toggle
+  let isBalanceHidden = true;
+
   const statusMap = {
     alive: { badge: 'badge-alive', label: 'ALIVE', icon: '💚' },
     warning: { badge: 'badge-warning', label: 'WARNING', icon: '⚠️' },
@@ -85,7 +88,12 @@ export function renderDashboard(container) {
 
       <div class="card">
         <div class="flex items-center justify-between mb-md">
-          <h3>Vault Balance</h3>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <h3>Vault Balance</h3>
+            <button id="btn-toggle-balance" class="btn-ghost" style="border: none; background: transparent; cursor: pointer; font-size: 1.2rem; padding: 0 4px; filter: grayscale(100%); transition: all 0.2s;">
+              🙈
+            </button>
+          </div>
           <span class="text-emerald" style="font-size:1.2rem">💎</span>
         </div>
         <div class="stat-value" id="vault-balance" style="font-size: 2rem; margin-bottom: var(--space-md);"></div>
@@ -133,6 +141,15 @@ export function renderDashboard(container) {
       </div>
     </div>
   `;
+
+  // ─── Balance Toggle Logic ─────────────────────────────────────────
+  const btnToggleBalance = container.querySelector('#btn-toggle-balance');
+  if (btnToggleBalance) {
+    btnToggleBalance.addEventListener('click', () => {
+      isBalanceHidden = !isBalanceHidden;
+      update(); // Instantly trigger a UI refresh to show/hide the balance
+    });
+  }
 
   // Mount countdown ring
   const countdownMount = container.querySelector('#countdown-mount');
@@ -297,7 +314,10 @@ export function renderDashboard(container) {
     const heartbeatEl = container.querySelector('#stat-heartbeat');
     const lastCheckinEl = container.querySelector('#stat-last-checkin');
     const modeEl = container.querySelector('#stat-mode');
+
+    // Dynamic Vault Balance Reveal Logic
     const vaultEl = container.querySelector('#vault-balance');
+    const toggleBtnEl = container.querySelector('#btn-toggle-balance');
 
     if (ownerEl) ownerEl.textContent = store.formatAccountId(store.state.owner);
     if (beneficiaryEl) beneficiaryEl.textContent = store.formatAccountId(store.state.beneficiary);
@@ -308,8 +328,16 @@ export function renderDashboard(container) {
         ? '<span class="badge badge-alive" style="font-size:0.65rem;padding:2px 8px;"><span class="badge-dot"></span> On-Chain</span>'
         : '<span class="badge" style="font-size:0.65rem;padding:2px 8px;background:var(--surface-border);color:var(--text-muted);">Demo</span>';
     }
-    if (vaultEl) {
-      vaultEl.textContent = `${store.state.vaultBalance.toLocaleString()} MIDEN`;
+    if (vaultEl && toggleBtnEl) {
+      if (isBalanceHidden) {
+        vaultEl.textContent = `**** MIDEN`;
+        toggleBtnEl.textContent = '🙈'; // Monkey covering eyes
+        toggleBtnEl.style.filter = 'grayscale(100%)';
+      } else {
+        vaultEl.textContent = `${store.state.vaultBalance.toLocaleString()} MIDEN`;
+        toggleBtnEl.textContent = '👁️'; // Open eye
+        toggleBtnEl.style.filter = 'none';
+      }
     }
 
     // Assets
@@ -318,7 +346,7 @@ export function renderDashboard(container) {
       assetList.innerHTML = store.state.assets.map(a => `
         <div class="flex justify-between items-center" style="padding: 6px 0; border-bottom: 1px solid var(--surface-border);">
           <span class="text-sm text-secondary">${a.name}</span>
-          <span class="mono text-sm">${a.amount.toLocaleString()}</span>
+          <span class="mono text-sm">${isBalanceHidden ? '****' : a.amount.toLocaleString()}</span>
         </div>
       `).join('');
     }
