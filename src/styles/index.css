@@ -170,11 +170,16 @@ h3 {
 
 .main-content {
   flex: 1;
-  margin-left: var(--sidebar-width);
+  width: 100%;
+  margin-left: 0;
   padding: var(--space-xl) var(--space-2xl);
   max-width: 1200px;
   transition: margin-left var(--transition-normal);
   overflow-y: auto;
+}
+
+.main-content.has-sidebar {
+  margin-left: var(--sidebar-width);
 }
 
 /* --- Cards --- */
@@ -757,13 +762,11 @@ select.input {
 
   0%,
   100% {
-    opacity: 0.4;
-    transform: scale(0.95);
+    opacity: 0.3;
   }
 
   50% {
-    opacity: 0.8;
-    transform: scale(1.05);
+    opacity: 0.7;
   }
 }
 
@@ -1379,9 +1382,12 @@ select.input {
     box-shadow: 8px 0 32px rgba(0, 0, 0, 0.5);
   }
 
-  .main-content {
-    margin-left: 0;
+  .main-content,
+  .main-content.has-sidebar {
+    margin-left: 0 !important;
     padding: calc(56px + var(--space-md)) var(--space-md) var(--space-lg);
+    max-width: 100%;
+    width: 100%;
   }
 
   .connection-banner {
@@ -1392,6 +1398,11 @@ select.input {
     flex-direction: column;
     gap: var(--space-sm);
     align-items: flex-start;
+  }
+
+  .connection-label {
+    white-space: normal;
+    font-size: 0.75rem;
   }
 
   .connection-actions {
@@ -1433,6 +1444,12 @@ select.input {
     grid-template-columns: 1fr;
   }
 
+  /* Reset grid-row span when stacked in single column */
+  .grid-2>.card[style*="grid-row: span 2"],
+  .card-glow-emerald {
+    grid-row: span 1 !important;
+  }
+
   .countdown-ring {
     width: 220px;
     height: 220px;
@@ -1442,8 +1459,34 @@ select.input {
     font-size: 2rem;
   }
 
+  .countdown-container {
+    padding: var(--space-lg) 0;
+  }
+
   .page-title {
     font-size: 1.4rem;
+  }
+
+  .page-header {
+    flex-direction: column !important;
+    gap: var(--space-md);
+  }
+
+  .config-row {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .config-value {
+    word-break: break-all;
+  }
+
+  .stat-value {
+    font-size: 1.5rem !important;
+  }
+
+  h3 {
+    font-size: 1rem;
   }
 }
 
@@ -1617,6 +1660,10 @@ select.input {
   font-size: 0.8rem;
   color: var(--text-secondary);
   font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .connection-banner.demo {
@@ -2205,4 +2252,64 @@ select.input {
 .auth-form {
   display: flex;
   flex-direction: column;
+}
+
+/* --- Dynamic Heartbeat Animations --- */
+@keyframes heart-beat-alive {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  15% {
+    transform: scale(1.2);
+  }
+
+  30% {
+    transform: scale(1);
+  }
+
+  45% {
+    transform: scale(1.2);
+  }
+}
+
+@keyframes heart-beat-warning {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.status-heart {
+  display: inline-block;
+  font-size: inherit;
+  transition: all var(--transition-normal);
+}
+
+.status-heart.alive {
+  animation: heart-beat-alive 1.5s ease-in-out infinite;
+  color: var(--status-alive);
+  /* Emerald */
+  filter: drop-shadow(0 0 8px var(--status-alive-glow));
+}
+
+.status-heart.warning {
+  animation: heart-beat-warning 3s ease-in-out infinite;
+  color: var(--status-warning);
+  /* Orange/Yellow */
+  filter: drop-shadow(0 0 8px var(--status-warning-glow));
+}
+
+.status-heart.expired {
+  animation: none;
+  color: var(--status-expired);
+  /* Red */
+  opacity: 0.5;
 }

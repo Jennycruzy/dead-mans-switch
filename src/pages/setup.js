@@ -74,7 +74,7 @@ export function renderSetup(container) {
           </div>
           <div class="config-row">
             <span class="config-key">Vault Balance</span>
-            <span class="config-value">${state.vaultBalance.toLocaleString()} ${isConnected ? 'DMS' : 'MIDEN'}</span>
+            <span class="config-value">${state.vaultBalance.toLocaleString()} MIDEN</span>
           </div>
           <div class="config-row">
             <span class="config-key">Mode</span>

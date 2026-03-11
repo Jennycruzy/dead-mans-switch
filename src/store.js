@@ -238,8 +238,8 @@ class Store {
                 this.state.connected = true;
                 this.state.connecting = false;
                 this.state.txStatus = null;
-                this.state.vaultBalance = 10000;
-                this.state.assets = [{ name: 'DMS', amount: 10000, faucetId: '0xabc123' }];
+                this.state.vaultBalance = 0;
+                this.state.assets = [];
                 this.state.lastCheckinBlock = blockNum;
 
                 this.state.history.push({

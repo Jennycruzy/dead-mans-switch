@@ -8,8 +8,9 @@ export const CONFIG = {
 };
 
 // Smart switch for API requests:
-// Uses localhost when you are testing on your computer,
-// and uses your live Render backend when hosted on Vercel.
+// On localhost, use empty string so requests go through Vite's /api proxy
+// (avoids COOP/COEP cross-origin blocking).
+// On production, point to your live Render backend.
 export const API_BASE_URL = window.location.hostname === 'localhost'
-    ? 'http://localhost:3000'
+    ? ''
     : 'https://dead-mans-switch-xa39.onrender.com'; // ⚠️ Replace this with your actual Render URL once deployed

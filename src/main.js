@@ -30,8 +30,14 @@ function init() {
         const isAuth = !!localStorage.getItem('dms_authenticated');
         document.getElementById('sidebar').style.display = isAuth ? 'flex' : 'none';
         const mobileHeader = document.querySelector('.mobile-header');
-        if (mobileHeader) mobileHeader.style.display = isAuth ? 'flex' : 'none';
-        main.style.marginLeft = isAuth ? 'var(--sidebar-width)' : '0';
+        if (mobileHeader) mobileHeader.style.display = isAuth ? '' : 'none';
+        // Use a class instead of inline style so CSS media queries can override on mobile
+        if (isAuth) {
+            main.classList.add('has-sidebar');
+        } else {
+            main.classList.remove('has-sidebar');
+            main.style.marginLeft = '0';
+        }
     });
 
     app.appendChild(main);

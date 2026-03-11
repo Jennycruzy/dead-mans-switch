@@ -18,7 +18,6 @@ export function renderDashboard(container) {
   };
 
   container.innerHTML = `
-    <!-- Connection Banner -->
     <div class="connection-banner" id="connection-banner">
       <div class="connection-banner-inner">
         <div class="connection-info">
@@ -36,11 +35,9 @@ export function renderDashboard(container) {
     </div>
 
     <div class="grid grid-2 section stagger" id="top-section">
-      <!-- Countdown + Check-in -->
       <div class="card card-glow-emerald" id="countdown-card" style="grid-row: span 2;">
         <div id="countdown-mount"></div>
 
-        <!-- Period Toggle -->
         <div style="display:flex;flex-direction:column;align-items:center;gap:var(--space-sm);margin:var(--space-md) 0;">
           <div class="period-toggle-label">Claim Period</div>
           <div class="period-toggle" id="period-toggle">
@@ -55,10 +52,11 @@ export function renderDashboard(container) {
         <div class="flex justify-center mt-lg" id="checkin-area"></div>
       </div>
 
-      <!-- Status Card -->
       <div class="card" id="status-card">
         <div class="flex items-center justify-between mb-md">
-          <h3>Switch Status</h3>
+          <h3 style="display: flex; align-items: center; gap: 8px;">
+            Switch Status <span id="dashboard-heart" class="status-heart">❤️</span>
+          </h3>
           <span class="badge" id="status-badge"></span>
         </div>
         <div class="config-display" style="padding: var(--space-md);">
@@ -85,7 +83,6 @@ export function renderDashboard(container) {
         </div>
       </div>
 
-      <!-- Vault Card -->
       <div class="card">
         <div class="flex items-center justify-between mb-md">
           <h3>Vault Balance</h3>
@@ -96,13 +93,11 @@ export function renderDashboard(container) {
       </div>
     </div>
 
-    <!-- Recent Activity -->
     <div class="section">
       <h3 class="section-title">Recent Activity</h3>
       <div id="recent-activity"></div>
     </div>
 
-    <!-- How It Works -->
     <div class="how-it-works section">
       <button class="how-it-works-toggle" id="hiw-toggle">
         <span>💡 How Dead Man's Switch Works</span>
@@ -233,14 +228,14 @@ export function renderDashboard(container) {
 
   // ─── Check-in button ─────────────────────────────────────────────────
   const checkinArea = container.querySelector('#checkin-area');
-  const status = store.getStatus();
+  const initialStatus = store.getStatus();
 
-  if (status !== 'claimed') {
+  if (initialStatus !== 'claimed') {
     const btn = document.createElement('button');
     btn.className = 'btn btn-checkin';
     btn.id = 'btn-checkin';
     btn.innerHTML = `
-      <span class="btn-checkin-icon">🫀</span>
+      <span class="btn-checkin-icon status-heart ${initialStatus}">🫀</span>
       <span>Check In</span>
     `;
     btn.addEventListener('click', async () => {
@@ -256,7 +251,7 @@ export function renderDashboard(container) {
       }
       renderDashboard(container);
     });
-    if (status === 'expired') {
+    if (initialStatus === 'expired') {
       btn.style.opacity = '0.4';
       btn.style.pointerEvents = 'none';
     }
@@ -267,11 +262,26 @@ export function renderDashboard(container) {
   function update() {
     const s = store.getStatus();
     const info = statusMap[s];
+
+    // Update Badge
     const badge = container.querySelector('#status-badge');
     if (badge) {
       badge.className = `badge ${info.badge}`;
       badge.innerHTML = `<span class="badge-dot"></span> ${info.label}`;
     }
+
+    // Update Dashboard Heart
+    const dashboardHeart = container.querySelector('#dashboard-heart');
+    if (dashboardHeart) {
+      dashboardHeart.className = `status-heart ${s}`;
+    }
+
+    // Update Check-in Button Heart (only if not currently processing with the hourglass)
+    const checkinIcon = container.querySelector('.btn-checkin-icon');
+    if (checkinIcon && checkinIcon.textContent === '🫀') {
+      checkinIcon.className = `btn-checkin-icon status-heart ${s}`;
+    }
+
     countdown.update();
 
     // Sync period toggle active state
@@ -299,8 +309,7 @@ export function renderDashboard(container) {
         : '<span class="badge" style="font-size:0.65rem;padding:2px 8px;background:var(--surface-border);color:var(--text-muted);">Demo</span>';
     }
     if (vaultEl) {
-      const tokenName = store.state.connected ? 'DMS' : 'MIDEN';
-      vaultEl.textContent = `${store.state.vaultBalance.toLocaleString()} ${tokenName}`;
+      vaultEl.textContent = `${store.state.vaultBalance.toLocaleString()} MIDEN`;
     }
 
     // Assets

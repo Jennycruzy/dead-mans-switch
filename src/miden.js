@@ -1,7 +1,6 @@
 /**
  * Dead Man's Switch — Miden SDK Wrapper
- * 
- * Centralizes all interactions with the @miden-sdk/miden-sdk WebClient.
+ * * Centralizes all interactions with the @miden-sdk/miden-sdk WebClient.
  * Dynamically imports the SDK (WASM) so it only loads when the user
  * explicitly connects to the Miden network.
  */
@@ -91,15 +90,13 @@ export async function parseAddress(addressStr) {
 /**
  * Create a P2ID note from the owner to the beneficiary.
  * This represents the "heartbeat" note in the dead man's switch pattern.
- * 
- * In a real P2IDE implementation, the note would include time-lock and
+ * * In a real P2IDE implementation, the note would include time-lock and
  * reclaim block heights. The current SDK P2ID note allows the beneficiary
  * to consume it at any time, so we use the reclaim pattern:
  * - Owner creates a P2ID note TO the beneficiary
  * - Owner can reclaim it before the deadline (check-in)
  * - After the deadline, beneficiary consumes it (claim)
- * 
- * @param {object} ownerAccountId - Owner's AccountId
+ * * @param {object} ownerAccountId - Owner's AccountId
  * @param {object} beneficiaryAccountId - Beneficiary's AccountId  
  * @param {object} faucetId - Faucet ID for the asset
  * @param {bigint} amount - Amount in base units
@@ -220,6 +217,59 @@ export async function deployFaucet(symbol = 'DMS', decimals = 8, maxSupply = Big
 
     console.log('[Miden] Faucet deployed:', faucet.id().toString());
     return faucet;
+}
+
+// ─── Account Data Fetching ──────────────────────────────────────────────────
+
+/**
+ * Get the vault balance for a given account ID directly from the Miden node.
+ * @param {string} accountIdStr - The hex or bech32 account ID
+ */
+export async function getAccountBalance(accountIdStr) {
+    if (!_client) return 0;
+
+    try {
+        const sdk = await loadSDK();
+
+        // Parse the Account ID safely (handles both hex and standard strings)
+        let accId;
+        if (typeof accountIdStr === 'string' && accountIdStr.startsWith('0x')) {
+            accId = sdk.AccountId.fromHex(accountIdStr);
+        } else {
+            // Depending on the Miden WASM version, it might accept the raw string
+            accId = accountIdStr;
+        }
+
+        // Fetch the account from the local client store
+        const result = await _client.getAccount(accId);
+
+        // Safely extract the account object (some WebClient versions return a tuple)
+        const account = Array.isArray(result) ? result[0] : result;
+        if (!account) return 0;
+
+        // Open the vault and retrieve assets
+        const vault = account.vault ? account.vault() : null;
+        if (!vault) return 0;
+
+        const assets = vault.assets();
+        let totalBalance = 0;
+
+        // Iterate over the WASM asset array to sum up fungible tokens
+        for (let i = 0; i < assets.length; i++) {
+            const asset = assets[i];
+            if (asset.isFungible && asset.isFungible()) {
+                totalBalance += Number(asset.amount());
+            } else if (asset.amount) {
+                // Fallback sum if isFungible flag is missing in your SDK version
+                totalBalance += Number(asset.amount());
+            }
+        }
+
+        return totalBalance;
+    } catch (error) {
+        console.warn(`[Miden] Balance fetch error for ${accountIdStr}. Ensure the account is fully synced:`, error.message);
+        return 0; // Return 0 safely so the UI doesn't crash while syncing
+    }
 }
 
 // ─── Utilities ──────────────────────────────────────────────────────────────
