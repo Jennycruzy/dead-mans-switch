@@ -8,7 +8,8 @@ import store from '../store.js';
 import { showToast } from '../components/toast.js';
 import { showModal } from '../components/modal.js';
 import { navigate } from '../router.js';
-import { API_BASE_URL } from '../config.js'; // <-- NEW IMPORT
+import { API_BASE_URL } from '../config.js';
+import { connectExtension } from '../miden.js'; // <-- NEW IMPORT
 
 const PRESET_INTERVALS = [
   { label: '🗓️ Weekly', blocks: 201600, primary: true },
@@ -39,14 +40,25 @@ export function renderSetup(container) {
       <h3 class="section-title" style="color: var(--accent);">🔗 Connect Miden Wallet</h3>
       <div class="card" style="border-color: rgba(255, 90, 0, 0.5); background: rgba(255, 90, 0, 0.05);">
         <p class="text-sm" style="margin-bottom: var(--space-md);">
-          Your profile is active, but you haven't linked a Miden Testnet Account ID yet. Enter your Account ID to sync your wallet.
+          Your profile is active, but you haven't linked a Miden Testnet Account ID yet. Connect your extension or enter your ID manually.
         </p>
+        
+        <button class="btn btn-primary" id="btn-connect-extension" style="width: 100%; margin-bottom: var(--space-md); background: linear-gradient(135deg, var(--accent-orange), #E04D00); border: none;">
+          <span style="font-size: 1.2rem; margin-right: 8px;">🦊</span> Auto-Connect via Extension
+        </button>
+
+        <div style="display: flex; align-items: center; text-align: center; color: var(--text-muted); font-size: 0.85rem; margin: var(--space-md) 0;">
+          <span style="flex: 1; border-bottom: 1px solid var(--surface-border);"></span>
+          <span style="padding: 0 var(--space-md);">or enter manually</span>
+          <span style="flex: 1; border-bottom: 1px solid var(--surface-border);"></span>
+        </div>
+
         <div class="input-group">
           <label for="bind-account-id">Account ID (Hex or Bech32)</label>
           <input type="text" class="input" id="bind-account-id" placeholder="0x..." style="font-family: monospace;" />
         </div>
-        <button class="btn btn-primary mt-sm" id="btn-bind-wallet" style="width: 100%;">
-          Bind Wallet & Connect
+        <button class="btn btn-ghost mt-sm" id="btn-bind-wallet" style="width: 100%;">
+          Bind Manually
         </button>
       </div>
     </div>
@@ -155,7 +167,50 @@ export function renderSetup(container) {
     </div>
   `;
 
-  // Handle Binding a Miden Wallet
+  // ─── NEW: Handle Extension Auto-Connect ───
+  const connectExtBtn = container.querySelector('#btn-connect-extension');
+  if (connectExtBtn) {
+    connectExtBtn.addEventListener('click', async () => {
+      try {
+        connectExtBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="margin-right: 8px;"></span> Waiting for wallet...';
+        connectExtBtn.disabled = true;
+
+        // Call the extension
+        const result = await connectExtension();
+
+        if (result && result.accountId) {
+          showToast('Wallet approved! Syncing account...', 'info');
+
+          // Push the new account ID to your backend database
+          const token = localStorage.getItem('dms_token');
+          const res = await fetch(`${API_BASE_URL}/api/account/bind`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ midenAccountId: result.accountId })
+          });
+
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to sync wallet with backend');
+
+          // Save to local storage and refresh
+          localStorage.setItem('dms_miden_account_id', result.accountId);
+          showToast('Wallet connected and secured!', 'success');
+
+          renderSetup(container);
+          store.connect(); // Instantly trigger the on-chain connection
+        }
+      } catch (err) {
+        showToast(err.message, 'error');
+        connectExtBtn.innerHTML = '<span style="font-size: 1.2rem; margin-right: 8px;">🦊</span> Auto-Connect via Extension';
+        connectExtBtn.disabled = false;
+      }
+    });
+  }
+
+  // ─── Handle Manual Binding ───
   const bindBtn = container.querySelector('#btn-bind-wallet');
   if (bindBtn) {
     bindBtn.addEventListener('click', async () => {
@@ -170,7 +225,6 @@ export function renderSetup(container) {
 
       try {
         const token = localStorage.getItem('dms_token');
-        // ⚠️ USE THE NEW SMART URL HERE
         const res = await fetch(`${API_BASE_URL}/api/account/bind`, {
           method: 'POST',
           headers: {
@@ -184,16 +238,15 @@ export function renderSetup(container) {
         if (!res.ok) throw new Error(data.error || 'Failed to bind wallet');
 
         localStorage.setItem('dms_miden_account_id', accountId);
-        showToast('Wallet bound successfully! Connecting...', 'success');
+        showToast('Manual Watch-Mode wallet bound! Connecting...', 'success');
 
-        // Refresh Setup screen and let store connect
         renderSetup(container);
         store.connect();
 
       } catch (err) {
         showToast(err.message, 'error');
         bindBtn.disabled = false;
-        bindBtn.textContent = 'Bind Wallet & Connect';
+        bindBtn.textContent = 'Bind Manually';
       }
     });
   }
