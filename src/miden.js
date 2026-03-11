@@ -281,31 +281,45 @@ export async function getAccountBalance(accountIdStr) {
 
 /**
  * Connects directly to the Miden Wallet Chrome Extension
- * Allows users to fetch their real account without exposing keys
+ * Automatically scans for the provider and waits if it's injecting slowly
  */
 export async function connectExtension() {
-    // Check if the Miden Wallet provider is injected into the browser window
-    if (typeof window.miden !== 'undefined') {
+    console.log('[Miden Extension] Searching for wallet injection...');
+
+    // Web3 extensions sometimes take a fraction of a second to inject.
+    // We will poll for it 10 times over 1 second before giving up.
+    let provider = null;
+    for (let i = 0; i < 10; i++) {
+        provider = window.midenWallet || window.miden || window.midenProvider;
+        if (provider) break;
+        await new Promise(r => setTimeout(r, 100)); // wait 100ms
+    }
+
+    if (provider) {
         try {
-            console.log('[Miden Extension] Requesting account access...');
+            console.log('[Miden Extension] Found provider, requesting access...');
+            const requestMethod = provider.request || provider.connect;
 
-            // Request accounts from the extension
-            const accounts = await window.miden.request({ method: 'miden_requestAccounts' });
+            if (!requestMethod) {
+                throw new Error("Provider found, but it lacks a connection method.");
+            }
 
-            if (accounts && accounts.length > 0) {
-                const accountId = accounts[0];
+            const response = await requestMethod.call(provider, { method: 'miden_requestAccounts' });
+            const accountId = Array.isArray(response) ? response[0] : (response?.accountId || response);
+
+            if (accountId) {
                 console.log('[Miden Extension] Connected successfully! Account:', accountId);
                 return { connected: true, accountId: accountId };
             } else {
-                throw new Error("No accounts found in Miden Wallet.");
+                throw new Error("No accounts were found in the wallet.");
             }
         } catch (error) {
-            console.error('[Miden Extension] Connection failed or user rejected:', error);
-            throw new Error('Connection to Miden Wallet was rejected.');
+            console.error('[Miden Extension] Connection failed:', error);
+            throw new Error('Connection to Miden Wallet was rejected or failed.');
         }
     } else {
-        console.warn('[Miden Extension] Extension not found in window.');
-        throw new Error('Please install the Miden Wallet Chrome Extension to connect directly.');
+        console.warn('[Miden Extension] Extension not found in window after 1 second.');
+        throw new Error('Could not detect the Miden extension. Please ensure you are logged into the extension and refresh the page!');
     }
 }
 
