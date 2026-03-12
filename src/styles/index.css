@@ -1691,28 +1691,30 @@ select.input {
 }
 
 .banner-close {
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   color: #fff;
   font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all var(--transition-fast);
   border-radius: 50%;
-  margin-right: 12px;
+  margin-right: 14px;
   order: -1;
   flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .banner-close:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
   color: #fff;
-  transform: rotate(90deg);
+  transform: rotate(90deg) scale(1.1);
 }
 
 .connection-actions {

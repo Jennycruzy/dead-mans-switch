@@ -34,6 +34,7 @@ function init() {
         // Use a class instead of inline style so CSS media queries can override on mobile
         if (isAuth) {
             main.classList.add('has-sidebar');
+            main.style.marginLeft = ''; // Allow CSS to take over
         } else {
             main.classList.remove('has-sidebar');
             main.style.marginLeft = '0';
