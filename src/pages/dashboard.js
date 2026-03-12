@@ -23,6 +23,7 @@ export function renderDashboard(container) {
   container.innerHTML = `
     <div class="connection-banner" id="connection-banner">
       <div class="connection-banner-inner">
+        <button class="banner-close" id="banner-close" title="Dismiss">&times;</button>
         <div class="connection-info">
           <span class="connection-dot" id="connection-dot"></span>
           <span class="connection-label" id="connection-label"></span>
@@ -142,6 +143,17 @@ export function renderDashboard(container) {
     </div>
   `;
 
+  // ─── Banner Dismiss Logic ──────────────────────────────────────────
+  const closeBtn = container.querySelector('#banner-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      isBannerDismissed = true;
+      sessionStorage.setItem('dms_banner_dismissed', 'true');
+      const banner = container.querySelector('#connection-banner');
+      if (banner) banner.style.display = 'none';
+    });
+  }
+
   // ─── Balance Toggle Logic ─────────────────────────────────────────
   const btnToggleBalance = container.querySelector('#btn-toggle-balance');
   if (btnToggleBalance) {
@@ -195,18 +207,6 @@ export function renderDashboard(container) {
     }
 
     actions.innerHTML = '';
-
-    // Add Close Button
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'banner-close';
-    closeBtn.innerHTML = '&times;';
-    closeBtn.title = 'Dismiss';
-    closeBtn.addEventListener('click', () => {
-      isBannerDismissed = true;
-      sessionStorage.setItem('dms_banner_dismissed', 'true');
-      banner.style.display = 'none';
-    });
-    banner.querySelector('.connection-banner-inner').appendChild(closeBtn);
 
     if (store.state.connecting) {
       dot.className = 'connection-dot connecting';

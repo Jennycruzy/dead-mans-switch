@@ -1698,12 +1698,15 @@ select.input {
   line-height: 1;
   cursor: pointer;
   padding: 0 8px;
-  margin-left: 8px;
+  margin-right: 8px;
+  /* On the left of the content */
   display: flex;
   align-items: center;
   justify-content: center;
   transition: color var(--transition-fast);
   border-radius: 4px;
+  order: -1;
+  /* Make it first if needed */
 }
 
 .banner-close:hover {
