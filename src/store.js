@@ -248,8 +248,14 @@ class Store {
                 this.state.connected = true;
                 this.state.connecting = false;
                 this.state.txStatus = null;
-                this.state.vaultBalance = 0;
-                this.state.assets = [];
+
+                // Fetch real balance from the extension/client
+                miden.getAccountBalance(userAccountId).then(({ total, assets }) => {
+                    this.state.vaultBalance = total;
+                    this.state.assets = assets;
+                    this._notify();
+                });
+
                 this.state.lastCheckinBlock = blockNum;
 
                 this.state.history.push({
