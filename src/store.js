@@ -152,24 +152,15 @@ class Store {
         if (this._blockInterval) clearInterval(this._blockInterval);
         if (this._syncInterval) clearInterval(this._syncInterval);
 
-        if (this.state.connected) {
-            // Real mode: poll block number every 10 seconds
-            this._blockInterval = setInterval(async () => {
-                try {
-                    const blockNum = await miden.syncState();
-                    this.state.currentBlock = blockNum;
-                    this._notify();
-                } catch (e) {
-                    console.warn('[Store] Block sync error:', e);
-                }
-            }, 10_000);
-        } else {
+        if (!this.state.connected) {
             // Demo mode: fake it
             this._blockInterval = setInterval(() => {
                 this.state.currentBlock += 1;
                 this._notify();
             }, 1000);
         }
+        // Real mode: stop polling to prevent extension popups.
+        // Sync should only happen during explicit user actions.
     }
 
     // ─── Connection Management ──────────────────────────────────────────────
