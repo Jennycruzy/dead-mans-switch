@@ -1690,6 +1690,27 @@ select.input {
   padding-left: 22px;
 }
 
+.banner-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 8px;
+  margin-left: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--transition-fast);
+  border-radius: 4px;
+}
+
+.banner-close:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .connection-actions {
   display: flex;
   gap: var(--space-sm);

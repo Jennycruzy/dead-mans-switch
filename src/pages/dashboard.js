@@ -179,6 +179,8 @@ export function renderDashboard(container) {
   }
 
   // ─── Connection banner logic ─────────────────────────────────────────
+  let isBannerDismissed = sessionStorage.getItem('dms_banner_dismissed') === 'true';
+
   function updateConnectionBanner() {
     const banner = container.querySelector('#connection-banner');
     const dot = container.querySelector('#connection-dot');
@@ -187,7 +189,24 @@ export function renderDashboard(container) {
     const statusText = container.querySelector('#connection-status-text');
     if (!banner) return;
 
+    if (isBannerDismissed) {
+      banner.style.display = 'none';
+      return;
+    }
+
     actions.innerHTML = '';
+
+    // Add Close Button
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'banner-close';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.title = 'Dismiss';
+    closeBtn.addEventListener('click', () => {
+      isBannerDismissed = true;
+      sessionStorage.setItem('dms_banner_dismissed', 'true');
+      banner.style.display = 'none';
+    });
+    banner.querySelector('.connection-banner-inner').appendChild(closeBtn);
 
     if (store.state.connecting) {
       dot.className = 'connection-dot connecting';

@@ -124,7 +124,12 @@ export function renderSidebar(container) {
     const badgeDot = sidebar.querySelector('#wallet-badge-dot');
     const modeLabel = sidebar.querySelector('#sidebar-mode-label');
 
-    if (walletId) walletId.textContent = store.formatAccountId(store.state.owner);
+    // Prioritize the actual connected Account ID string from the SDK if available
+    const displayId = store.state.ownerAccountId
+      ? store.state.ownerAccountId.toString()
+      : (store.state.owner.full || store.state.owner.prefix);
+
+    if (walletId) walletId.textContent = store.formatAccountId({ full: displayId, prefix: displayId.slice(0, 10), suffix: displayId.slice(-8) });
 
     if (badgeDot) {
       if (store.state.connecting) {

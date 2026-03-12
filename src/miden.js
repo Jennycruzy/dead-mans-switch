@@ -145,10 +145,8 @@ export async function getAccountBalance(accountIdStr) {
             // Calculate the total fungible balance
             const total = assetList.reduce((acc, a) => acc + a.amount, 0);
 
-            if (total > 0) {
+            if (total >= 0) {
                 return { total, assets: assetList };
-            } else {
-                console.log('[Miden Extension] Reported 0 balance, falling back to mock for demo visibility.');
             }
         }
     } catch (e) {
@@ -156,8 +154,8 @@ export async function getAccountBalance(accountIdStr) {
     }
 
     // 🔥 BREAK-GLASS FALLBACK
-    // If the chain is empty or extension fails, we return a 
-    // mock balance to ensure the dashboard looks alive for the user.
+    // ONLY used if the extension provider is missing or requested fails.
+    // DOES NOT trigger if the account simply has 0 balance.
     return {
         total: 1000,
         assets: [
