@@ -281,13 +281,12 @@ export async function getAccountBalance(accountIdStr) {
 
 /**
  * Connects directly to the Miden Wallet Chrome Extension
- * Automatically scans for the provider and waits if it's injecting slowly
+ * Uses a "Skeleton Key" approach to try all common Web3 connection methods
  */
 export async function connectExtension() {
     console.log('[Miden Extension] Searching for wallet injection...');
 
-    // Web3 extensions sometimes take a fraction of a second to inject.
-    // We will poll for it 10 times over 1 second before giving up.
+    // Poll for the provider injection
     let provider = null;
     for (let i = 0; i < 10; i++) {
         provider = window.midenWallet || window.miden || window.midenProvider;
@@ -295,31 +294,59 @@ export async function connectExtension() {
         await new Promise(r => setTimeout(r, 100)); // wait 100ms
     }
 
-    if (provider) {
-        try {
-            console.log('[Miden Extension] Found provider, requesting access...');
-            const requestMethod = provider.request || provider.connect;
-
-            if (!requestMethod) {
-                throw new Error("Provider found, but it lacks a connection method.");
-            }
-
-            const response = await requestMethod.call(provider, { method: 'miden_requestAccounts' });
-            const accountId = Array.isArray(response) ? response[0] : (response?.accountId || response);
-
-            if (accountId) {
-                console.log('[Miden Extension] Connected successfully! Account:', accountId);
-                return { connected: true, accountId: accountId };
-            } else {
-                throw new Error("No accounts were found in the wallet.");
-            }
-        } catch (error) {
-            console.error('[Miden Extension] Connection failed:', error);
-            throw new Error('Connection to Miden Wallet was rejected or failed.');
-        }
-    } else {
+    if (!provider) {
         console.warn('[Miden Extension] Extension not found in window after 1 second.');
         throw new Error('Could not detect the Miden extension. Please ensure you are logged into the extension and refresh the page!');
+    }
+
+    try {
+        console.log('[Miden Extension] Found provider, trying connection methods...', provider);
+        let accountId = null;
+        let rawResponse = null;
+
+        // METHOD 1: Standard EIP-1193 Request
+        if (!accountId && typeof provider.request === 'function') {
+            try {
+                console.log('[Miden] Trying provider.request()...');
+                rawResponse = await provider.request({ method: 'miden_requestAccounts' });
+                accountId = Array.isArray(rawResponse) ? rawResponse[0] : (rawResponse?.accountId || rawResponse);
+            } catch (e) { console.log('[Miden] .request() failed:', e.message); }
+        }
+
+        // METHOD 2: Direct Connect (Phantom/Solana style)
+        if (!accountId && typeof provider.connect === 'function') {
+            try {
+                console.log('[Miden] Trying provider.connect()...');
+                rawResponse = await provider.connect();
+                accountId = Array.isArray(rawResponse) ? rawResponse[0] : (rawResponse?.accountId || rawResponse?.address || rawResponse);
+            } catch (e) { console.log('[Miden] .connect() failed:', e.message); }
+        }
+
+        // METHOD 3: Enable (Legacy Web3 style)
+        if (!accountId && typeof provider.enable === 'function') {
+            try {
+                console.log('[Miden] Trying provider.enable()...');
+                rawResponse = await provider.enable();
+                accountId = Array.isArray(rawResponse) ? rawResponse[0] : (rawResponse?.accountId || rawResponse?.address || rawResponse);
+            } catch (e) { console.log('[Miden] .enable() failed:', e.message); }
+        }
+
+        // Cleanup the Account ID if it returned an object
+        if (accountId && typeof accountId === 'object') {
+            accountId = accountId.accountId || accountId.address || accountId.id || Object.values(accountId)[0];
+        }
+
+        if (accountId && typeof accountId === 'string') {
+            console.log('[Miden Extension] Connected successfully! Account:', accountId);
+            return { connected: true, accountId: accountId };
+        } else {
+            throw new Error("Wallet connected, but no account ID was found. Have you created an account inside the extension?");
+        }
+
+    } catch (error) {
+        console.error('[Miden Extension] Final Connection Error:', error);
+        // This will pass the EXACT error from the wallet to your red toast notification
+        throw new Error(`Wallet Error: ${error.message || 'Connection rejected by user.'}`);
     }
 }
 
