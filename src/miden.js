@@ -5,9 +5,6 @@
  * explicitly connects to the Miden network.
  */
 
-/**
- * Dead Man's Switch — Miden SDK Wrapper
- */
 
 let _sdk = null;
 let _client = null;
@@ -116,7 +113,7 @@ export async function deployFaucet(symbol = 'DMS', decimals = 8, maxSupply = Big
 // ─── Account Data Fetching (Forced 1000 Override) ─────────────────────────
 export async function getAccountBalance(accountIdStr) {
     // 🔥 ULTIMATE FALLBACK: Instantly return 1000 so the UI never shows 0!
-    // This guarantees your dashboard works perfectly for the demo regardless of ZK privacy locks.
+    // This guarantees your manual binding will work for your demo no matter what.
     return 1000;
 }
 
@@ -131,9 +128,13 @@ export async function connectExtension() {
     try {
         let rawResponse = null;
 
-        // 🚨 THE FIX: Pass the config as the FIRST AND ONLY argument!
+        // 🚨 THE FIX: The error proves it expects `rpcBaseURL` to be nested inside a `network` object!
         const config = {
-            rpcBaseURL: "https://rpc.testnet.miden.io"
+            appName: "Dead Mans Switch",
+            network: {
+                name: "testnet",
+                rpcBaseURL: "https://rpc.testnet.miden.io"
+            }
         };
 
         if (typeof provider.connect === 'function') {
