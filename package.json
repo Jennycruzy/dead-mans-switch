@@ -14,6 +14,7 @@
     "vite-plugin-wasm": "^3.5.0"
   },
   "dependencies": {
+    "@demox-labs/miden-wallet-adapter-miden": "^0.10.0",
     "@miden-sdk/miden-sdk": "^0.13.2",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",

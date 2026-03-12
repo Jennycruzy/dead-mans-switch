@@ -5,7 +5,6 @@
  * explicitly connects to the Miden network.
  */
 
-
 let _sdk = null;
 let _client = null;
 let _prover = null;
@@ -119,56 +118,34 @@ export async function getAccountBalance(accountIdStr) {
 
 // ─── Chrome Extension Integration ──────────────────────────────────────────
 export async function connectExtension() {
-    const provider = window.miden || window.midenWallet || window.midenProvider;
-
-    if (!provider) {
-        throw new Error('Miden Wallet extension not found. Please install and unlock it.');
-    }
-
     try {
-        let rawResponse = null;
+        // 1. Dynamically load the official Demox Labs adapter (just like Miden-SDK)
+        const { MidenWalletAdapter } = await import('@demox-labs/miden-wallet-adapter-miden');
 
-        // 🚨 THE FIX: The error proves it expects `rpcBaseURL` to be nested inside a `network` object!
-        const config = {
-            appName: "Dead Mans Switch",
-            network: {
-                name: "testnet",
-                rpcBaseURL: "https://rpc.testnet.miden.io"
-            }
-        };
+        // 2. Initialize it EXACTLY how Dome and Playground do
+        const adapter = new MidenWalletAdapter({ appName: 'Dead Mans Switch' });
 
-        if (typeof provider.connect === 'function') {
-            rawResponse = await provider.connect(config);
-        } else if (typeof provider.request === 'function') {
-            rawResponse = await provider.request({
-                method: 'miden_requestAccounts',
-                params: [config]
-            });
-        }
+        // 3. Connect (The adapter handles all the crazy internal rpcBaseURL configs for us!)
+        await adapter.connect();
 
-        if (!rawResponse) {
-            throw new Error(`Popup failed to open.`);
-        }
+        // 4. Extract the account ID safely
+        const accountId = adapter.accountId || adapter.address || adapter.publicKey;
 
-        // Extract the Account ID from the wallet's response
-        let accountId = null;
-        if (typeof rawResponse === 'string') accountId = rawResponse;
-        else if (Array.isArray(rawResponse)) accountId = rawResponse[0];
-        else if (rawResponse.address) accountId = rawResponse.address;
-        else if (rawResponse.accountId) accountId = rawResponse.accountId;
-
-        if (accountId && typeof accountId === 'object') {
-            accountId = accountId.accountId || accountId.address || Object.values(accountId)[0];
-        }
-
-        if (accountId && typeof accountId === 'string') {
-            return { connected: true, accountId: accountId };
+        if (accountId) {
+            console.log('[Miden Extension] Connected successfully via Adapter!', accountId);
+            return { connected: true, accountId: accountId.toString() };
         } else {
-            throw new Error(`Connected, but no valid address was returned.`);
+            throw new Error("Adapter connected, but no account ID was returned.");
+        }
+    } catch (error) {
+        console.error(error);
+
+        // Catch if the package wasn't installed
+        if (error.message.includes('resolve module') || error.message.includes('find module')) {
+            throw new Error(`Missing package! Please run: npm install @demox-labs/miden-wallet-adapter-miden`);
         }
 
-    } catch (error) {
-        throw new Error(`Connection Error: ${error.message}`);
+        throw new Error(`Wallet Adapter Error: ${error.message}`);
     }
 }
 
