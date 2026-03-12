@@ -5,6 +5,10 @@
  * explicitly connects to the Miden network.
  */
 
+/**
+ * Dead Man's Switch — Miden SDK Wrapper
+ * Production implementation without mock data.
+ */
 
 let _sdk = null;
 let _client = null;
@@ -33,9 +37,9 @@ export async function initClient() {
         console.log('[Miden] Connected — latest block:', blockNum);
         return { client: _client, blockNum };
     } catch (error) {
-        console.error('[Miden] Fallback to un-synced block.', error);
+        console.error('[Miden] Client initialization failed.', error);
         _client = null;
-        return { client: null, blockNum: 1000000 };
+        return { client: null, blockNum: 0 };
     }
 }
 
@@ -58,12 +62,87 @@ export async function parseAddress(addressStr) {
     }
 }
 
-// ─── Account Data Fetching (Forced 1000 Override) ─────────────────────────
+export async function createHeartbeatNote(ownerAccountId, beneficiaryAccountId, faucetId, amount) {
+    if (!_client) throw new Error('Client not initialized');
+    const sdk = await loadSDK();
+    const assets = new sdk.NoteAssets([new sdk.FungibleAsset(faucetId, amount)]);
+    return sdk.Note.createP2IDNote(ownerAccountId, beneficiaryAccountId, assets, sdk.NoteType.Public, new sdk.NoteAttachment());
+}
+
+export async function submitNotesTransaction(senderAccountId, outputNotes) {
+    if (!_client) throw new Error('Client not initialized');
+    const sdk = await loadSDK();
+    const wrappedNotes = outputNotes.map(n => sdk.OutputNote.full(n));
+    const txRequest = new sdk.TransactionRequestBuilder().withOwnOutputNotes(new sdk.OutputNoteArray(wrappedNotes)).build();
+    const txResult = await _client.executeTransaction(senderAccountId, txRequest);
+    const proven = await _client.proveTransaction(txResult, _prover);
+    const submissionHeight = await _client.submitProvenTransaction(proven, txResult);
+    await _client.applyTransaction(txResult, submissionHeight);
+    return { txResult, submissionHeight };
+}
+
+export async function consumeNotes(accountId) {
+    if (!_client) throw new Error('Client not initialized');
+    await _client.syncState();
+    const consumableNotes = await _client.getConsumableNotes(accountId);
+    if (!consumableNotes || consumableNotes.length === 0) return null;
+    const noteList = consumableNotes.map(rec => rec.inputNoteRecord().toNote());
+    const txRequest = _client.newConsumeTransactionRequest(noteList);
+    const txResult = await _client.executeTransaction(accountId, txRequest);
+    const proven = await _client.proveTransaction(txResult, _prover);
+    const submissionHeight = await _client.submitProvenTransaction(proven, txResult);
+    await _client.applyTransaction(txResult, submissionHeight);
+    return { consumed: noteList.length, submissionHeight };
+}
+
+export async function mintTokens(faucetAccountId, targetAccountId, amount) {
+    if (!_client) throw new Error('Client not initialized');
+    const sdk = await loadSDK();
+    const txRequest = _client.newMintTransactionRequest(targetAccountId, faucetAccountId, sdk.NoteType.Public, amount);
+    const txResult = await _client.executeTransaction(faucetAccountId, txRequest);
+    const proven = await _client.proveTransaction(txResult, _prover);
+    const submissionHeight = await _client.submitProvenTransaction(proven, txResult);
+    await _client.applyTransaction(txResult, submissionHeight);
+    await new Promise(r => setTimeout(r, 7000));
+    await _client.syncState();
+    return { submissionHeight };
+}
+
+export async function deployFaucet(symbol = 'DMS', decimals = 8, maxSupply = BigInt(1_000_000)) {
+    if (!_client) throw new Error('Client not initialized');
+    const sdk = await loadSDK();
+    return await _client.newFaucet(sdk.AccountStorageMode.public(), false, symbol, decimals, maxSupply, sdk.AuthScheme.AuthRpoFalcon512);
+}
+
+// ─── Account Data Fetching ────────────────────────────────────────────────
 export async function getAccountBalance(accountIdStr) {
-    // 🔥 ULTIMATE FALLBACK: Instantly return 1000.
-    // If you ever need to bypass the extension for a live demo, pasting your address 
-    // in the "Bind Manually" box is mathematically guaranteed to show your 1000 balance!
-    return 1000;
+    if (!_client) return 0;
+    try {
+        const sdk = await loadSDK();
+        let accId = (typeof accountIdStr === 'string' && accountIdStr.startsWith('0x')) ? sdk.AccountId.fromHex(accountIdStr) : accountIdStr;
+
+        // Fetch the account from the public testnet
+        const result = await _client.getAccount(accId);
+        const account = Array.isArray(result) ? result[0] : result;
+
+        if (!account) return 0;
+
+        const vault = account.vault ? account.vault() : null;
+        if (!vault) return 0;
+
+        const assets = vault.assets();
+        let totalBalance = 0;
+        for (let i = 0; i < assets.length; i++) {
+            const asset = assets[i];
+            if (asset.isFungible && asset.isFungible()) totalBalance += Number(asset.amount());
+            else if (asset.amount) totalBalance += Number(asset.amount());
+        }
+
+        return totalBalance;
+    } catch (error) {
+        console.warn(`[Miden ZK Privacy] Public node cannot decrypt this account's private vault.`);
+        return 0;
+    }
 }
 
 // ─── Chrome Extension Integration ──────────────────────────────────────────
@@ -75,50 +154,20 @@ export async function connectExtension() {
     }
 
     try {
-        console.log('[Miden Extension] Firing Omni-Config to raw extension...');
-
-        // 🚨 THE OMNI-CONFIG: We put rpcBaseURL everywhere so the extension cannot possibly miss it.
-        const omniConfig = {
-            appName: "Dead Mans Switch",
-            rpcBaseURL: RPC_ENDPOINT, // Top level
-            url: RPC_ENDPOINT,
-            network: {
-                name: "testnet",
-                rpcBaseURL: RPC_ENDPOINT, // Nested level
-                url: RPC_ENDPOINT
-            },
-            options: {
-                rpcBaseURL: RPC_ENDPOINT
-            }
-        };
-
+        // Attempt standard JSON-RPC Web3 Connection
         let rawResponse = null;
-
-        // Try the standard direct connect method
-        if (typeof provider.connect === 'function') {
-            rawResponse = await provider.connect(omniConfig);
-        }
-        // Fallback to request method
-        else if (typeof provider.request === 'function') {
+        if (typeof provider.request === 'function') {
             rawResponse = await provider.request({
-                method: 'miden_requestAccounts',
-                params: [omniConfig]
+                method: 'miden_requestAccounts'
             });
-
-            // If the array param fails, try the object param
-            if (!rawResponse) {
-                rawResponse = await provider.request({
-                    method: 'miden_requestAccounts',
-                    params: omniConfig
-                });
-            }
+        } else if (typeof provider.connect === 'function') {
+            rawResponse = await provider.connect();
         }
 
         if (!rawResponse) {
-            throw new Error(`The extension received the signal but failed to open.`);
+            throw new Error('No response from wallet.');
         }
 
-        // Extract the Account ID securely
         let accountId = null;
         if (typeof rawResponse === 'string') accountId = rawResponse;
         else if (Array.isArray(rawResponse)) accountId = rawResponse[0];
@@ -132,11 +181,12 @@ export async function connectExtension() {
         if (accountId && typeof accountId === 'string') {
             return { connected: true, accountId: accountId };
         } else {
-            throw new Error(`Connected, but no valid address was returned.`);
+            throw new Error(`Invalid data shape returned.`);
         }
 
     } catch (error) {
-        throw new Error(`Wallet Error: ${error.message}`);
+        console.error('[Miden Adapter Error]', error);
+        throw new Error(`Wallet connection is unstable in this Miden Alpha version (${error.message}). Please paste your address below to Bind Manually.`);
     }
 }
 
