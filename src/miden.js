@@ -177,39 +177,36 @@ export async function connectExtension() {
     }
 
     try {
-        console.log('[Miden Extension] Requesting connection...');
+        console.log('[Miden Extension] Starting connection flow...');
 
-        // ─── Phase 1: Try miden_accounts (Modern Standard) ──────────────────
-        let rawResponse = null;
-        if (typeof provider.request === 'function') {
+        // ─── Phase 1: Explicitly trigger the Wallet UI ────────────────────
+        if (typeof provider.connect === 'function') {
+            console.log('[Miden Extension] Calling provider.connect()...');
             try {
-                console.log('[Miden Extension] Attempting miden_accounts request...');
-                rawResponse = await provider.request({ method: 'miden_accounts' });
+                // This is the most likely way to trigger the popup
+                await provider.connect("AUTO", "testnet");
             } catch (err) {
-                console.warn('[Miden Extension] miden_accounts request failed, falling back...', err);
+                console.warn('[Miden Extension] .connect("AUTO", "testnet") failed, trying positional params...', err);
+                try {
+                    await provider.connect(
+                        "AUTO",
+                        { name: "testnet", rpcBaseURL: "https://rpc.testnet.miden.io:443" },
+                        65535
+                    );
+                } catch (e2) {
+                    console.warn('[Miden Extension] All .connect attempts failed, falling back to .request()', e2);
+                }
             }
         }
 
-        // ─── Phase 2: Mandatory .connect() for Permissions ────────────────
-        // Even if we have the address, we MUST call connect to get 
-        // asset/note permissions (AllowedPrivateData.All).
-        if (typeof provider.connect === 'function') {
+        // ─── Phase 2: Request Account Access ──────────────────────────────
+        let rawResponse = null;
+        if (typeof provider.request === 'function') {
             try {
-                console.log('[Miden Extension] Requesting full permissions...');
-                // Try positional args format (most compatible)
-                await provider.connect(
-                    "AUTO", // privateDataPermission
-                    { name: "testnet", rpcBaseURL: "https://rpc.testnet.miden.io:443" }, // network
-                    65535 // AllowedPrivateData.All
-                );
+                console.log('[Miden Extension] Requesting miden_accounts...');
+                rawResponse = await provider.request({ method: 'miden_accounts' });
             } catch (err) {
-                console.warn('[Miden Extension] Positional .connect() failed, trying alternative signature...', err);
-                try {
-                    // Try some versions that expect ("AUTO", "testnet")
-                    await provider.connect("AUTO", "testnet");
-                } catch (innerErr) {
-                    console.error('[Miden Extension] All .connect() attempts failed:', innerErr);
-                }
+                console.warn('[Miden Extension] miden_accounts request failed', err);
             }
         }
 

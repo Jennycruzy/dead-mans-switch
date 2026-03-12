@@ -206,10 +206,17 @@ class Store {
 
         this.state.connecting = true;
         this.state.connectionError = null;
-        this.state.txStatus = 'Initializing Miden client...';
+        this.state.txStatus = 'Waiting for Wallet Extension...';
         this._notify();
 
         try {
+            // 0. Ensure extension is connected & authorized
+            // We add a 30s timeout here so we don't hang forever if the user ignores the popup
+            await Promise.race([
+                miden.connectExtension(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Wallet interaction timed out')), 30000))
+            ]);
+
             // 1. Init client
             const { client, blockNum } = await miden.initClient();
 
