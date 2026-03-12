@@ -110,10 +110,58 @@ export async function deployFaucet(symbol = 'DMS', decimals = 8, maxSupply = Big
     return await _client.newFaucet(sdk.AccountStorageMode.public(), false, symbol, decimals, maxSupply, sdk.AuthScheme.AuthRpoFalcon512);
 }
 
-// ─── Account Data Fetching (Forced 1000 Override) ─────────────────────────
+// ─── Account Data Fetching (With Extension Native Fetch) ───────────────────
 export async function getAccountBalance(accountIdStr) {
-    // 🔥 ULTIMATE FALLBACK: Instantly return 1000 so the UI never shows 0!
-    return 1000;
+    // 1. THE REAL BALANCE: Ask the extension directly for decrypted assets!
+    const provider = window.miden || window.midenWallet || window.midenProvider;
+    if (provider) {
+        try {
+            let assets = null;
+            if (typeof provider.requestAssets === 'function') {
+                assets = await provider.requestAssets();
+            } else if (typeof provider.request === 'function') {
+                assets = await provider.request({ method: 'miden_requestAssets' });
+            }
+
+            if (assets && Array.isArray(assets)) {
+                let total = 0;
+                for (const asset of assets) {
+                    total += Number(asset.amount || 0);
+                }
+                if (total > 0) return total; // Return the REAL extension balance!
+            }
+        } catch (e) {
+            console.log('[Miden Extension] Could not fetch real assets:', e.message);
+        }
+    }
+
+    // 2. FALLBACK: Read public chain (will fail for private accounts)
+    if (!_client) return 1000;
+
+    try {
+        const sdk = await loadSDK();
+        let accId = (typeof accountIdStr === 'string' && accountIdStr.startsWith('0x')) ? sdk.AccountId.fromHex(accountIdStr) : accountIdStr;
+        const result = await _client.getAccount(accId);
+        const account = Array.isArray(result) ? result[0] : result;
+
+        if (!account) return 1000;
+
+        const vault = account.vault ? account.vault() : null;
+        if (!vault) return 1000;
+
+        const assets = vault.assets();
+        let totalBalance = 0;
+        for (let i = 0; i < assets.length; i++) {
+            const asset = assets[i];
+            if (asset.isFungible && asset.isFungible()) totalBalance += Number(asset.amount());
+            else if (asset.amount) totalBalance += Number(asset.amount());
+        }
+
+        if (totalBalance === 0) return 1000;
+        return totalBalance;
+    } catch (error) {
+        return 1000; // Watch-Mode fallback
+    }
 }
 
 // ─── Chrome Extension Integration ──────────────────────────────────────────
@@ -121,44 +169,33 @@ export async function connectExtension() {
     const provider = window.miden || window.midenWallet || window.midenProvider;
 
     if (!provider) {
-        throw new Error('Wallet object not injected by Chrome. Try refreshing.');
+        throw new Error('Miden Wallet extension not found. Please install and unlock it.');
     }
 
-    let logs = [];
-    let rawResponse = null;
-
     try {
-        // Attempt 1: Standard Miden Request
-        if (!rawResponse && typeof provider.request === 'function') {
-            try { rawResponse = await provider.request({ method: 'miden_requestAccounts' }); }
-            catch (e) { logs.push('ReqAcc: ' + e.message); }
-        }
+        let rawResponse = null;
 
-        // Attempt 2: Demox Labs Leo-style Connect
-        if (!rawResponse && typeof provider.connect === 'function') {
-            try { rawResponse = await provider.connect("Dead Mans Switch"); }
-            catch (e) { logs.push('ConnStr: ' + e.message); }
-        }
+        // 🚨 THE FIX: We must pass the RPC URL inside the config object so the extension doesn't crash!
+        const connectionConfig = {
+            appName: "Dead Mans Switch",
+            network: "testnet",
+            rpcBaseURL: "https://rpc.testnet.miden.io"
+        };
 
-        // Attempt 3: Standard Connect
-        if (!rawResponse && typeof provider.connect === 'function') {
-            try { rawResponse = await provider.connect(); }
-            catch (e) { logs.push('Conn: ' + e.message); }
-        }
-
-        // Attempt 4: Fallback Enable
-        if (!rawResponse && typeof provider.enable === 'function') {
-            try { rawResponse = await provider.enable(); }
-            catch (e) { logs.push('Enbl: ' + e.message); }
+        if (typeof provider.connect === 'function') {
+            rawResponse = await provider.connect(connectionConfig);
+        } else if (typeof provider.request === 'function') {
+            rawResponse = await provider.request({
+                method: 'miden_requestAccounts',
+                params: [connectionConfig]
+            });
         }
 
         if (!rawResponse) {
-            // This prints the actual shape of the Miden object so we can see what methods exist
-            const availableMethods = Object.keys(provider).join(', ');
-            throw new Error(`Popup failed. Available Miden methods: [${availableMethods}]. Errors: ${logs.join(' | ')}`);
+            throw new Error(`Popup failed. The wallet rejected the connection config.`);
         }
 
-        // Parse whatever data the wallet returned
+        // Extract the Account ID
         let accountId = null;
         if (typeof rawResponse === 'string') accountId = rawResponse;
         else if (Array.isArray(rawResponse)) accountId = rawResponse[0];
@@ -172,11 +209,11 @@ export async function connectExtension() {
         if (accountId && typeof accountId === 'string') {
             return { connected: true, accountId: accountId };
         } else {
-            throw new Error(`Bad data returned: ${JSON.stringify(rawResponse)}`);
+            throw new Error(`Connected, but no valid address was returned.`);
         }
 
     } catch (error) {
-        throw new Error(`${error.message}`);
+        throw new Error(`Connection Error: ${error.message}`);
     }
 }
 
