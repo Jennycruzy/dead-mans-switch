@@ -140,43 +140,58 @@ export async function connectExtension() {
     try {
         console.log('[Miden Extension] Requesting connection...');
 
-        // Use the strict .connect() method
-        // Positional args: (permission, networkConfig, allowedPrivateData)
-        let rawResponse;
-        if (typeof provider.connect === 'function') {
-            console.log('[Miden Extension] Using positional .connect()');
-            await provider.connect(
-                "AUTO", // privateDataPermission
-                { name: "testnet", rpcBaseURL: RPC_ENDPOINT }, // network
-                65535 // allowedPrivateData (All)
-            );
-            // After connect, the address is typically available on the provider
-            rawResponse = provider.address || provider.accountId;
-        } else if (typeof provider.request === 'function') {
-            rawResponse = await provider.request({ method: 'miden_accounts' });
+        // ─── Phase 1: Try miden_accounts (Modern Standard) ──────────────────
+        let rawResponse = null;
+        if (typeof provider.request === 'function') {
+            try {
+                console.log('[Miden Extension] Attempting miden_accounts request...');
+                rawResponse = await provider.request({ method: 'miden_accounts' });
+            } catch (err) {
+                console.warn('[Miden Extension] miden_accounts request failed, falling back...', err);
+            }
         }
 
-        if (!rawResponse && !provider.address) {
-            throw new Error(`The extension failed to return an account.`);
+        // ─── Phase 2: Try connect() variants if no response yet ──────────────
+        if (!rawResponse && !provider.address && typeof provider.connect === 'function') {
+            try {
+                console.log('[Miden Extension] Attempting .connect() with string network...');
+                // Some versions expect ("AUTO", "testnet")
+                await provider.connect("AUTO", "testnet");
+            } catch (err) {
+                console.warn('[Miden Extension] String-based .connect() failed, trying object-based...', err);
+                try {
+                    // Fallback to strict object format with explicit port
+                    await provider.connect({
+                        appName: "Dead Mans Switch",
+                        network: {
+                            name: "testnet",
+                            rpcBaseURL: "https://rpc.testnet.miden.io:443"
+                        }
+                    });
+                } catch (innerErr) {
+                    console.error('[Miden Extension] All .connect() attempts failed:', innerErr);
+                }
+            }
         }
 
-        // Safely extract the Account ID from various possible response formats
-        let accountId = provider.address || provider.accountId;
+        // ─── Phase 3: Robust ID Extraction ────────────────────────────────────
+        let accountId = provider.address || provider.accountId || provider.id;
 
-        if (!accountId) {
+        if (!accountId && rawResponse) {
+            console.log('[Miden Extension] Checking raw response:', rawResponse);
             if (typeof rawResponse === 'string') {
                 accountId = rawResponse;
             } else if (Array.isArray(rawResponse)) {
                 const first = rawResponse[0];
                 accountId = typeof first === 'string' ? first : (first.address || first.accountId || first.id);
             } else if (typeof rawResponse === 'object' && rawResponse !== null) {
-                accountId = rawResponse.address || rawResponse.accountId || rawResponse.id || rawResponse.account?.id;
+                accountId = rawResponse.address || rawResponse.accountId || rawResponse.id || rawResponse.account?.id || rawResponse.accountAddress;
             }
         }
 
-        // Handle case where it might be nested
+        // Final check: extract from nested objects if necessary
         if (accountId && typeof accountId === 'object') {
-            accountId = accountId.accountId || accountId.address || Object.values(accountId)[0];
+            accountId = accountId.accountId || accountId.address || accountId.id || Object.values(accountId)[0];
         }
 
         if (accountId && typeof accountId === 'string') {
