@@ -137,9 +137,8 @@ export async function getAccountBalance(accountIdStr) {
                 const faucetId = a.faucetId || a.faucet_id || a.issuer;
                 const rawAmount = a.amount || a.value || a.balance || '0';
 
-                // Miden tokens (like most testnet assets) use 9 decimals.
-                // We normalize to a human-readable number.
-                const scaledAmount = Number(rawAmount) / 1_000_000_000;
+                // User confirms tokens use 6-decimal scaling (10^6 divisor).
+                const scaledAmount = Number(rawAmount) / 1_000_000;
 
                 return {
                     name: faucetId ? `Token (Faucet: ${faucetId.slice(0, 8)})` : 'Unrecognized Asset',
