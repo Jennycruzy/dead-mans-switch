@@ -141,34 +141,37 @@ export async function connectExtension() {
         console.log('[Miden Extension] Requesting connection...');
 
         // Use the strict .connect() method
-        // Try multiple ways since the extension API is in flux
+        // Positional args: (permission, networkConfig, allowedPrivateData)
         let rawResponse;
         if (typeof provider.connect === 'function') {
-            rawResponse = await provider.connect({
-                appName: "Dead Mans Switch",
-                network: {
-                    name: "testnet",
-                    rpcBaseURL: RPC_ENDPOINT
-                }
-            });
+            console.log('[Miden Extension] Using positional .connect()');
+            await provider.connect(
+                "AUTO", // privateDataPermission
+                { name: "testnet", rpcBaseURL: RPC_ENDPOINT }, // network
+                65535 // allowedPrivateData (All)
+            );
+            // After connect, the address is typically available on the provider
+            rawResponse = provider.address || provider.accountId;
         } else if (typeof provider.request === 'function') {
             rawResponse = await provider.request({ method: 'miden_accounts' });
         }
 
-        if (!rawResponse) {
+        if (!rawResponse && !provider.address) {
             throw new Error(`The extension failed to return an account.`);
         }
 
         // Safely extract the Account ID from various possible response formats
-        let accountId = null;
+        let accountId = provider.address || provider.accountId;
 
-        if (typeof rawResponse === 'string') {
-            accountId = rawResponse;
-        } else if (Array.isArray(rawResponse)) {
-            const first = rawResponse[0];
-            accountId = typeof first === 'string' ? first : (first.address || first.accountId || first.id);
-        } else if (typeof rawResponse === 'object') {
-            accountId = rawResponse.address || rawResponse.accountId || rawResponse.id || rawResponse.account?.id;
+        if (!accountId) {
+            if (typeof rawResponse === 'string') {
+                accountId = rawResponse;
+            } else if (Array.isArray(rawResponse)) {
+                const first = rawResponse[0];
+                accountId = typeof first === 'string' ? first : (first.address || first.accountId || first.id);
+            } else if (typeof rawResponse === 'object' && rawResponse !== null) {
+                accountId = rawResponse.address || rawResponse.accountId || rawResponse.id || rawResponse.account?.id;
+            }
         }
 
         // Handle case where it might be nested
