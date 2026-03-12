@@ -150,9 +150,10 @@ class Store {
      */
     _startBlockProgression() {
         if (this._blockInterval) clearInterval(this._blockInterval);
+        if (this._syncInterval) clearInterval(this._syncInterval);
 
         if (this.state.connected) {
-            // Real mode: poll from chain
+            // Real mode: poll block number
             this._blockInterval = setInterval(async () => {
                 try {
                     const blockNum = await miden.syncState();
@@ -162,6 +163,20 @@ class Store {
                     console.warn('[Store] Block sync error:', e);
                 }
             }, 10_000);
+
+            // Poll balance every 30 seconds
+            this._syncInterval = setInterval(async () => {
+                if (this.state.owner?.full) {
+                    try {
+                        const { total, assets } = await miden.getAccountBalance(this.state.owner.full);
+                        this.state.vaultBalance = total;
+                        this.state.assets = assets;
+                        this._notify();
+                    } catch (e) {
+                        console.warn('[Store] Balance poll failed:', e);
+                    }
+                }
+            }, 30_000);
         } else {
             // Demo mode: fake it
             this._blockInterval = setInterval(() => {
