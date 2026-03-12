@@ -51,8 +51,20 @@ export function getLastBlockNum() {
 export async function parseAddress(addressStr) {
     const sdk = await loadSDK();
     try {
-        return sdk.Address.fromBech32(addressStr).accountId();
+        if (addressStr.startsWith('mtst') || addressStr.startsWith('mm') || addressStr.startsWith('mdev')) {
+            return sdk.Address.fromBech32(addressStr).accountId();
+        } else if (addressStr.startsWith('0x')) {
+            return sdk.AccountId.fromHex(addressStr);
+        } else {
+            // Try as hex first, then bech32 fallback
+            try {
+                return sdk.AccountId.fromHex('0x' + addressStr);
+            } catch {
+                return sdk.Address.fromBech32(addressStr).accountId();
+            }
+        }
     } catch (e) {
+        console.error('[Miden SDK] Failed to parse address:', addressStr, e);
         return null;
     }
 }
@@ -128,33 +140,47 @@ export async function connectExtension() {
     try {
         console.log('[Miden Extension] Requesting connection...');
 
-        // Use the strict .connect() method (No .request arrays to crash the extension)
-        const rawResponse = await provider.connect({
-            appName: "Dead Mans Switch",
-            network: {
-                name: "testnet",
-                rpcBaseURL: RPC_ENDPOINT
-            }
-        });
+        // Use the strict .connect() method
+        // Try multiple ways since the extension API is in flux
+        let rawResponse;
+        if (typeof provider.connect === 'function') {
+            rawResponse = await provider.connect({
+                appName: "Dead Mans Switch",
+                network: {
+                    name: "testnet",
+                    rpcBaseURL: RPC_ENDPOINT
+                }
+            });
+        } else if (typeof provider.request === 'function') {
+            rawResponse = await provider.request({ method: 'miden_accounts' });
+        }
 
         if (!rawResponse) {
             throw new Error(`The extension failed to return an account.`);
         }
 
-        // Safely extract the Account ID
+        // Safely extract the Account ID from various possible response formats
         let accountId = null;
-        if (typeof rawResponse === 'string') accountId = rawResponse;
-        else if (Array.isArray(rawResponse)) accountId = rawResponse[0];
-        else if (rawResponse.address) accountId = rawResponse.address;
-        else if (rawResponse.accountId) accountId = rawResponse.accountId;
 
+        if (typeof rawResponse === 'string') {
+            accountId = rawResponse;
+        } else if (Array.isArray(rawResponse)) {
+            const first = rawResponse[0];
+            accountId = typeof first === 'string' ? first : (first.address || first.accountId || first.id);
+        } else if (typeof rawResponse === 'object') {
+            accountId = rawResponse.address || rawResponse.accountId || rawResponse.id || rawResponse.account?.id;
+        }
+
+        // Handle case where it might be nested
         if (accountId && typeof accountId === 'object') {
             accountId = accountId.accountId || accountId.address || Object.values(accountId)[0];
         }
 
         if (accountId && typeof accountId === 'string') {
+            console.log('[Miden Extension] Connected:', accountId);
             return { connected: true, accountId: accountId };
         } else {
+            console.error('[Miden Extension] Invalid response format:', rawResponse);
             throw new Error(`Connected, but the wallet returned invalid data.`);
         }
 

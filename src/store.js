@@ -28,6 +28,16 @@ function generateAccountId() {
 
 function parseHexAccountId(hexId) {
     if (!hexId) return null;
+
+    // If it's a bech32 address (mtst...), don't treat it as hex for slicing
+    if (hexId.startsWith('mtst') || hexId.startsWith('mm') || hexId.startsWith('mdev')) {
+        return {
+            prefix: hexId.substring(0, 12),
+            suffix: '...' + hexId.substring(hexId.length - 6),
+            full: hexId
+        };
+    }
+
     return {
         prefix: hexId.substring(0, 10),
         suffix: '0x' + hexId.substring(hexId.length - 8),
