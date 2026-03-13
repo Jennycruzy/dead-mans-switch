@@ -180,67 +180,65 @@ export async function connectExtension() {
         console.log('[Miden Extension] Starting connection flow...');
 
         // ─── Phase 1: Explicitly trigger the Wallet UI ────────────────────
-        if (typeof provider.connect === 'function') {
-            console.log('[Miden Extension] Calling provider.connect()...');
-            try {
-                // This is the most likely way to trigger the popup
-                await provider.connect("AUTO", "testnet");
-            } catch (err) {
-                console.warn('[Miden Extension] .connect("AUTO", "testnet") failed, trying positional params...', err);
+        // We wrap the entire interaction in a timeout to prevent hanging the UI
+        const connectionTask = async () => {
+            if (typeof provider.connect === 'function') {
+                console.log('[Miden Extension] Calling provider.connect()...');
                 try {
+                    await provider.connect("AUTO", "testnet");
+                } catch (err) {
+                    console.warn('[Miden Extension] .connect failed, trying positional params...', err);
                     await provider.connect(
                         "AUTO",
                         { name: "testnet", rpcBaseURL: "https://rpc.testnet.miden.io:443" },
                         65535
                     );
-                } catch (e2) {
-                    console.warn('[Miden Extension] All .connect attempts failed, falling back to .request()', e2);
                 }
             }
-        }
 
-        // ─── Phase 2: Request Account Access ──────────────────────────────
-        let rawResponse = null;
-        if (typeof provider.request === 'function') {
-            try {
+            // ─── Phase 2: Request Account Access ──────────────────────────────
+            let rawResponse = null;
+            if (typeof provider.request === 'function') {
                 console.log('[Miden Extension] Requesting miden_accounts...');
                 rawResponse = await provider.request({ method: 'miden_accounts' });
-            } catch (err) {
-                console.warn('[Miden Extension] miden_accounts request failed', err);
             }
-        }
 
-        // ─── Phase 3: Robust ID Extraction ────────────────────────────────────
-        let accountId = provider.address || provider.accountId || provider.id;
+            // ─── Phase 3: Robust ID Extraction ────────────────────────────────────
+            let accountId = provider.address || provider.accountId || provider.id;
 
-        if (!accountId && rawResponse) {
-            console.log('[Miden Extension] Checking raw response:', rawResponse);
-            if (typeof rawResponse === 'string') {
-                accountId = rawResponse;
-            } else if (Array.isArray(rawResponse)) {
-                const first = rawResponse[0];
-                accountId = typeof first === 'string' ? first : (first.address || first.accountId || first.id);
-            } else if (typeof rawResponse === 'object' && rawResponse !== null) {
-                accountId = rawResponse.address || rawResponse.accountId || rawResponse.id || rawResponse.account?.id || rawResponse.accountAddress;
+            if (!accountId && rawResponse) {
+                if (typeof rawResponse === 'string') {
+                    accountId = rawResponse;
+                } else if (Array.isArray(rawResponse)) {
+                    const first = rawResponse[0];
+                    accountId = typeof first === 'string' ? first : (first.address || first.accountId || first.id);
+                } else if (typeof rawResponse === 'object' && rawResponse !== null) {
+                    accountId = rawResponse.address || rawResponse.accountId || rawResponse.id || rawResponse.account?.id || rawResponse.accountAddress;
+                }
             }
-        }
 
-        // Final check: extract from nested objects if necessary
-        if (accountId && typeof accountId === 'object') {
-            accountId = accountId.accountId || accountId.address || accountId.id || Object.values(accountId)[0];
-        }
+            if (accountId && typeof accountId === 'object') {
+                accountId = accountId.accountId || accountId.address || accountId.id;
+            }
+
+            return accountId;
+        };
+
+        const accountId = await Promise.race([
+            connectionTask(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Wallet interaction timed out (30s). Please check your extension popup.')), 30000))
+        ]);
 
         if (accountId && typeof accountId === 'string') {
             console.log('[Miden Extension] Connected:', accountId);
             return { connected: true, accountId: accountId };
         } else {
-            console.error('[Miden Extension] Invalid response format:', rawResponse);
-            throw new Error(`Connected, but the wallet returned invalid data.`);
+            throw new Error(`Connected, but the wallet returned invalid or empty data.`);
         }
 
     } catch (error) {
         console.error('[Miden Connection Error]', error);
-        throw new Error(`Miden Alpha Error: ${error.message}`);
+        throw new Error(error.message || 'Miden Alpha Error');
     }
 }
 

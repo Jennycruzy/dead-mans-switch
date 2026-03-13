@@ -189,7 +189,8 @@ app.post('/api/account/bind', authenticateToken, async (req, res) => {
 app.get('/api/account/me', authenticateToken, async (req, res) => {
     try {
         const user = await dbGet('SELECT miden_account_id FROM users WHERE id = ?', [req.user.id]);
-        res.json({ miden_account_id: user.miden_account_id });
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        res.json({ miden_account_id: user.miden_account_id || null });
     } catch (error) {
         console.error('Fetch account error:', error);
         res.status(500).json({ error: 'Internal server error' });

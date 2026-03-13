@@ -172,7 +172,7 @@ export function renderSetup(container) {
   if (connectExtBtn) {
     connectExtBtn.addEventListener('click', async () => {
       try {
-        connectExtBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="margin-right: 8px;"></span> Waiting for wallet...';
+        connectExtBtn.textContent = '🦊 Connecting...';
         connectExtBtn.disabled = true;
 
         // Call the extension

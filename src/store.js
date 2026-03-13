@@ -187,8 +187,20 @@ class Store {
                 const res = await fetch(`${API_BASE_URL}/api/account/me`, {
                     headers: { 'Authorization': `Bearer ${dmsToken}` }
                 });
-                const data = await res.json();
-                if (data.miden_account_id) {
+
+                if (!res.ok) {
+                    const text = await res.text();
+                    throw new Error(`Server error (${res.status}): ${text || 'Unknown endpoint error'}`);
+                }
+
+                let data;
+                try {
+                    data = await res.json();
+                } catch (jsonErr) {
+                    throw new Error('Malformed server response (invalid JSON).');
+                }
+
+                if (data && data.miden_account_id) {
                     userAccountId = data.miden_account_id;
                     localStorage.setItem('dms_miden_account_id', userAccountId);
                 } else {
@@ -198,7 +210,7 @@ class Store {
                 }
             } catch (err) {
                 console.error('Failed to fetch account config:', err);
-                this.state.connectionError = 'Network error fetching wallet profile.';
+                this.state.connectionError = err.message || 'Network error fetching wallet profile.';
                 this._notify();
                 return;
             }
@@ -211,11 +223,8 @@ class Store {
 
         try {
             // 0. Ensure extension is connected & authorized
-            // We add a 30s timeout here so we don't hang forever if the user ignores the popup
-            await Promise.race([
-                miden.connectExtension(),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Wallet interaction timed out')), 30000))
-            ]);
+            // Timeout is now handled centrally in miden.connectExtension()
+            await miden.connectExtension();
 
             // 1. Init client
             const { client, blockNum } = await miden.initClient();
