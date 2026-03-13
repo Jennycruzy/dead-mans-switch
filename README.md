@@ -14,6 +14,8 @@
 If you stop checking in, your assets automatically become claimable by your designated beneficiary. No intermediaries. No trust assumptions. No key sharing. Just cryptographic guarantees enforced by Miden's ZK-powered note system.
 
 > **Live Frontend:** [Coming Soon — Vercel Deployment]
+> **Source Repo:** [github.com/Jennycruzy/dead-mans-switch](https://github.com/Jennycruzy/dead-mans-switch)
+> **SDK:** [@miden-sdk/miden-sdk](https://www.npmjs.com/package/@miden-sdk/miden-sdk)
 > **SDK:** [@miden-sdk/miden-sdk](https://www.npmjs.com/package/@miden-sdk/miden-sdk)
 > **Docs:** [docs.miden.xyz/builder](https://docs.miden.xyz/builder)
 
@@ -271,7 +273,7 @@ dead-mans-switch/
 
 ```bash
 # Clone the repository
-git clone https://github.com/giwaov/dead-mans-switch.git
+git clone https://github.com/Jennycruzy/dead-mans-switch.git
 cd dead-mans-switch
 
 # Install dependencies
@@ -290,16 +292,29 @@ npm run build
 # Output in dist/
 ```
 
-### Connect to Miden Testnet
+### Miden Contract Development (Rust)
 
-1. Open the app in your browser
-2. On the Dashboard, click **"🔗 Connect to Miden"** in the connection banner
-3. The app will:
-   - Initialize the Miden WebClient (WASM loads ~10s)
-   - Create an owner wallet on testnet
-   - Deploy a DMS fungible faucet
-   - Mint 10,000 test tokens
-4. You're now operating on the real Miden testnet!
+If you want to modify or deploy the Miden smart contracts:
+
+```bash
+# 1. Install Rust Nightly & WASM Target
+rustup install nightly
+rustup target add wasm32-unknown-unknown --toolchain nightly
+
+# 2. Install Miden CLI
+cargo install cargo-miden
+
+# 3. Build & Compile Contracts (MASM/MASP)
+cd contracts
+miden build   # Compiles Rust to Miden Assembly (.masp)
+
+# 4. Deploy to Testnet
+# Option A: via Miden CLI
+miden deploy --account-component target/miden/deadmans_wallet.masp
+
+# Option B: via integration script
+cargo run --bin deploy
+```
 
 > **Note:** The first connection takes ~30-60 seconds due to WASM initialization and account creation. Subsequent operations are much faster.
 
