@@ -402,7 +402,7 @@ class Store {
                     block: result ? result.submissionHeight : this.state.currentBlock,
                     timestamp: Date.now(),
                     title: 'Funds Claimed by Beneficiary (On-Chain)',
-                    description: `Beneficiary consumed expired P2ID notes and received ${this.state.vaultBalance} DMS tokens.`,
+                    description: `Beneficiary consumed expired P2ID notes and received ${this.state.vaultBalance} Miden tokens.`,
                 });
 
                 this._notify();

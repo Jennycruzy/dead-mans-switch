@@ -15,7 +15,7 @@ export function renderClaim(container) {
     const isExpired = store.isExpired();
     const isClaimed = store.state.claimed;
     const isConnected = store.state.connected;
-    const tokenName = isConnected ? 'DMS' : 'MIDEN';
+    const tokenName = 'Miden';
 
     // Success state after claiming
     if (isClaimed) {

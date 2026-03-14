@@ -159,9 +159,13 @@ const authenticateToken = (req, res, next) => {
 
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) return res.status(403).json({ error: 'Forbidden' });
-        req.user = user;
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+        if (err) {
+            console.error('[Auth] Token verification failed:', err.message);
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        console.log('[Auth] Token verified for user ID:', decoded.id);
+        req.user = decoded;
         next();
     });
 };
@@ -188,11 +192,18 @@ app.post('/api/account/bind', authenticateToken, async (req, res) => {
 // Get Current Configured Account ID
 app.get('/api/account/me', authenticateToken, async (req, res) => {
     try {
+        console.log('[Account] Fetching ID for user:', req.user.id);
         const user = await dbGet('SELECT miden_account_id FROM users WHERE id = ?', [req.user.id]);
-        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        if (!user) {
+            console.warn('[Account] User not found in DB:', req.user.id);
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        console.log('[Account] Returning Miden ID:', user.miden_account_id);
         res.json({ miden_account_id: user.miden_account_id || null });
     } catch (error) {
-        console.error('Fetch account error:', error);
+        console.error('[Account] Fetch error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

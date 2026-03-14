@@ -116,7 +116,7 @@ export async function mintTokens(faucetAccountId, targetAccountId, amount) {
     return { submissionHeight };
 }
 
-export async function deployFaucet(symbol = 'DMS', decimals = 8, maxSupply = BigInt(1_000_000)) {
+export async function deployFaucet(symbol = 'Miden', decimals = 8, maxSupply = BigInt(1_000_000)) {
     if (!_client) throw new Error('Client not initialized');
     const sdk = await loadSDK();
     return await _client.newFaucet(sdk.AccountStorageMode.public(), false, symbol, decimals, maxSupply, sdk.AuthScheme.AuthRpoFalcon512);

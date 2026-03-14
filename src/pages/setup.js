@@ -86,7 +86,7 @@ export function renderSetup(container) {
           </div>
           <div class="config-row">
             <span class="config-key">Vault Balance</span>
-            <span class="config-value">${state.vaultBalance.toLocaleString()} MIDEN</span>
+            <span class="config-value">${state.vaultBalance.toLocaleString()} Miden</span>
           </div>
           <div class="config-row">
             <span class="config-key">Mode</span>

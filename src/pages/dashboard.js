@@ -349,11 +349,11 @@ export function renderDashboard(container) {
     }
     if (vaultEl && toggleBtnEl) {
       if (isBalanceHidden) {
-        vaultEl.textContent = `**** MIDEN`;
+        vaultEl.textContent = `**** Miden`;
         toggleBtnEl.textContent = '🙈'; // Monkey covering eyes
         toggleBtnEl.style.filter = 'grayscale(100%)';
       } else {
-        vaultEl.textContent = `${store.state.vaultBalance.toLocaleString()} MIDEN`;
+        vaultEl.textContent = `${store.state.vaultBalance.toLocaleString()} Miden`;
         toggleBtnEl.textContent = '👁️'; // Open eye
         toggleBtnEl.style.filter = 'none';
       }
