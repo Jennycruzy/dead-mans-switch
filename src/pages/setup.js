@@ -176,7 +176,9 @@ export function renderSetup(container) {
         connectExtBtn.disabled = true;
 
         // Call the extension
-        const result = await connectExtension();
+        const result = await connectExtension((msg) => {
+          connectExtBtn.textContent = `🦊 ${msg}`;
+        });
 
         if (result && result.accountId) {
           showToast('Wallet approved! Syncing account...', 'info');

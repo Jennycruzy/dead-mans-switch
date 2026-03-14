@@ -19,9 +19,11 @@ async function loadSDK() {
     return _sdk;
 }
 
-export async function initClient() {
+export async function initClient(onStatusUpdate) {
+    if (onStatusUpdate) onStatusUpdate('Initializing Miden SDK (WASM)...');
     const sdk = await loadSDK();
     try {
+        if (onStatusUpdate) onStatusUpdate('Connecting to Miden Testnet RPC...');
         _client = await Promise.race([
             sdk.WebClient.createClient(RPC_ENDPOINT),
             new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
@@ -169,7 +171,7 @@ export async function getAccountBalance(accountIdStr) {
 }
 
 // ─── Chrome Extension Integration ──────────────────────────────────────────
-export async function connectExtension() {
+export async function connectExtension(onStatusUpdate) {
     const provider = window.miden || window.midenWallet || window.midenProvider;
 
     if (!provider) {
@@ -177,50 +179,74 @@ export async function connectExtension() {
     }
 
     try {
+        if (onStatusUpdate) onStatusUpdate('Waiting for Wallet extension approval...');
         console.log('[Miden Extension] Starting connection flow...');
 
         // ─── Phase 1: Explicitly trigger the Wallet UI ────────────────────
         // We wrap the entire interaction in a timeout to prevent hanging the UI
         const connectionTask = async () => {
-            if (typeof provider.connect === 'function') {
+            console.log('[Miden Extension] Provider detected:', !!provider);
+
+            // ─── Phase 1: Try to get account if already authorized ──────────
+            let accountId = provider.address || provider.accountId || provider.id;
+            console.log('[Miden Extension] Initial account check:', accountId);
+
+            if (!accountId && typeof provider.request === 'function') {
+                console.log('[Miden Extension] Requesting accounts via provider.request...');
+                try {
+                    const accounts = await provider.request({ method: 'miden_accounts' });
+                    console.log('[Miden Extension] Request accounts response:', accounts);
+                    if (Array.isArray(accounts) && accounts.length > 0) {
+                        accountId = accounts[0];
+                    } else if (typeof accounts === 'string') {
+                        accountId = accounts;
+                    }
+                } catch (requestErr) {
+                    console.warn('[Miden Extension] provider.request failed:', requestErr);
+                }
+            }
+
+            // ─── Phase 2: Explicitly trigger connection if still no ID ──────
+            if (!accountId && typeof provider.connect === 'function') {
                 console.log('[Miden Extension] Calling provider.connect()...');
                 try {
+                    // Try standard connect
                     await provider.connect("AUTO", "testnet");
-                } catch (err) {
-                    console.warn('[Miden Extension] .connect failed, trying positional params...', err);
-                    await provider.connect(
-                        "AUTO",
-                        { name: "testnet", rpcBaseURL: "https://rpc.testnet.miden.io:443" },
-                        65535
-                    );
+                } catch (connectErr) {
+                    console.warn('[Miden Extension] primary .connect failed, trying fallback...', connectErr);
+                    try {
+                        await provider.connect(
+                            "AUTO",
+                            { name: "testnet", rpcBaseURL: "https://rpc.testnet.miden.io:443" },
+                            65535
+                        );
+                    } catch (fallbackErr) {
+                        console.error('[Miden Extension] fallback .connect also failed:', fallbackErr);
+                    }
                 }
             }
 
-            // ─── Phase 2: Request Account Access ──────────────────────────────
-            let rawResponse = null;
-            if (typeof provider.request === 'function') {
-                console.log('[Miden Extension] Requesting miden_accounts...');
-                rawResponse = await provider.request({ method: 'miden_accounts' });
-            }
+            // ─── Phase 3: Final Attempt to Extract ID ──────────────────────
+            if (!accountId) {
+                console.log('[Miden Extension] Final ID extraction attempt...');
+                accountId = provider.address || provider.accountId || provider.id;
 
-            // ─── Phase 3: Robust ID Extraction ────────────────────────────────────
-            let accountId = provider.address || provider.accountId || provider.id;
-
-            if (!accountId && rawResponse) {
-                if (typeof rawResponse === 'string') {
-                    accountId = rawResponse;
-                } else if (Array.isArray(rawResponse)) {
-                    const first = rawResponse[0];
-                    accountId = typeof first === 'string' ? first : (first.address || first.accountId || first.id);
-                } else if (typeof rawResponse === 'object' && rawResponse !== null) {
-                    accountId = rawResponse.address || rawResponse.accountId || rawResponse.id || rawResponse.account?.id || rawResponse.accountAddress;
+                if (!accountId && typeof provider.request === 'function') {
+                    const finalAccounts = await provider.request({ method: 'miden_accounts' });
+                    if (Array.isArray(finalAccounts) && finalAccounts.length > 0) {
+                        accountId = finalAccounts[0];
+                    } else if (typeof finalAccounts === 'string') {
+                        accountId = finalAccounts;
+                    }
                 }
             }
 
+            // Clean up object IDs
             if (accountId && typeof accountId === 'object') {
                 accountId = accountId.accountId || accountId.address || accountId.id;
             }
 
+            console.log('[Miden Extension] Connection task returning AccountID:', accountId);
             return accountId;
         };
 

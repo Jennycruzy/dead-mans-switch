@@ -223,11 +223,15 @@ class Store {
 
         try {
             // 0. Ensure extension is connected & authorized
-            // Timeout is now handled centrally in miden.connectExtension()
-            await miden.connectExtension();
+            const updateStatus = (msg) => {
+                this.state.txStatus = msg;
+                this._notify();
+            };
+
+            await miden.connectExtension(updateStatus);
 
             // 1. Init client
-            const { client, blockNum } = await miden.initClient();
+            const { client, blockNum } = await miden.initClient(updateStatus);
 
             // If the client failed to initialize (e.g., local dev WASM header errors),
             // gracefully degrade to Demo Mode

@@ -50,7 +50,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 miden_account_id TEXT DEFAULT NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
-        `);
+        `, async (err) => {
+            if (!err) {
+                // Seed demo user
+                const demoEmail = 'demo@miden.test';
+                const demoPass = 'miden123';
+                const hash = await bcrypt.hash(demoPass, 10);
+                db.run('INSERT OR IGNORE INTO users (email, password_hash) VALUES (?, ?)', [demoEmail, hash]);
+            }
+        });
     }
 });
 
